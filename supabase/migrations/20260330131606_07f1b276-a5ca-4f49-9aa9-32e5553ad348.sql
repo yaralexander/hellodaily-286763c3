@@ -1,0 +1,1 @@
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS activity_level text NOT NULL DEFAULT 'moderate';

@@ -1,0 +1,156 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222 47% 11%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --card-elevated: 0 0% 96%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+
+    --primary: 262 60% 55%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 222 15% 92%;
+    --secondary-foreground: 222 30% 30%;
+
+    --muted: 222 15% 94%;
+    --muted-foreground: 215 15% 45%;
+
+    --accent: 222 15% 92%;
+    --accent-foreground: 222 47% 11%;
+
+    --destructive: 0 72% 55%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 222 15% 88%;
+    --input: 222 15% 88%;
+    --ring: 262 60% 55%;
+
+    --radius: 1rem;
+
+    --health-activity: 142 70% 42%;
+    --health-heart: 0 85% 55%;
+    --health-sleep: 217 91% 55%;
+    --health-nutrition: 32 95% 50%;
+    --health-calories: 280 70% 55%;
+
+    --glass-bg: 0 0% 100% / 0.7;
+    --glass-border: 222 15% 88% / 0.5;
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 222 47% 11%;
+    --sidebar-primary: 262 60% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 222 15% 92%;
+    --sidebar-accent-foreground: 222 47% 11%;
+    --sidebar-border: 222 15% 88%;
+    --sidebar-ring: 262 60% 55%;
+  }
+
+  .dark {
+    --background: 222 47% 6%;
+    --foreground: 210 40% 96%;
+
+    --card: 222 41% 10%;
+    --card-foreground: 210 40% 96%;
+    --card-elevated: 222 38% 13%;
+
+    --popover: 222 41% 10%;
+    --popover-foreground: 210 40% 96%;
+
+    --primary: 262 60% 60%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 222 30% 18%;
+    --secondary-foreground: 210 30% 80%;
+
+    --muted: 222 30% 15%;
+    --muted-foreground: 215 20% 55%;
+
+    --accent: 222 30% 18%;
+    --accent-foreground: 210 40% 96%;
+
+    --destructive: 0 72% 55%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 222 25% 16%;
+    --input: 222 25% 16%;
+    --ring: 262 60% 60%;
+
+    --health-activity: 142 70% 49%;
+    --health-heart: 0 85% 60%;
+    --health-sleep: 217 91% 60%;
+    --health-nutrition: 32 95% 55%;
+    --health-calories: 280 70% 60%;
+
+    --glass-bg: 222 41% 10% / 0.6;
+    --glass-border: 222 25% 20% / 0.5;
+
+    --sidebar-background: 222 47% 6%;
+    --sidebar-foreground: 210 40% 96%;
+    --sidebar-primary: 262 60% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 222 30% 18%;
+    --sidebar-accent-foreground: 210 40% 96%;
+    --sidebar-border: 222 25% 16%;
+    --sidebar-ring: 262 60% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply text-foreground font-sans antialiased;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+}
+
+@layer utilities {
+  .glass-card {
+    @apply backdrop-blur-2xl border border-white/20 rounded-2xl;
+    background: rgba(255, 255, 255, 0.35);
+    box-shadow: 
+      0 12px 40px -6px rgba(0, 0, 0, 0.15),
+      0 6px 20px -4px rgba(0, 0, 0, 0.1),
+      0 2px 8px rgba(0, 0, 0, 0.06),
+      inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  }
+
+  .dark .glass-card {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.12);
+    box-shadow: 
+      0 12px 40px -6px rgba(0, 0, 0, 0.5),
+      0 6px 20px -4px rgba(0, 0, 0, 0.35),
+      0 2px 8px rgba(0, 0, 0, 0.2),
+      inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+  
+  .metric-glow-activity {
+    box-shadow: 0 8px 32px -4px hsl(142 70% 49% / 0.2), 0 4px 16px -2px rgba(0,0,0,0.08);
+  }
+  
+  .metric-glow-heart {
+    box-shadow: 0 8px 32px -4px hsl(0 85% 60% / 0.2), 0 4px 16px -2px rgba(0,0,0,0.08);
+  }
+  
+  .metric-glow-sleep {
+    box-shadow: 0 8px 32px -4px hsl(217 91% 60% / 0.2), 0 4px 16px -2px rgba(0,0,0,0.08);
+  }
+  
+  .metric-glow-nutrition {
+    box-shadow: 0 8px 32px -4px hsl(32 95% 55% / 0.2), 0 4px 16px -2px rgba(0,0,0,0.08);
+  }
+}
