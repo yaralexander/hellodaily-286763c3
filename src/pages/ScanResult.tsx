@@ -226,18 +226,18 @@ const ScanResult = () => {
           <button
             onClick={handleAddClick}
             disabled={addToMeals.isPending || !!(scan as any).added_at}
-            style={{ backgroundImage: "linear-gradient(90deg, hsl(152 65% 45%), hsl(142 70% 36%))" }}
-            className="rounded-xl px-4 py-3 flex items-center justify-center gap-2 text-sm font-bold !text-white shadow-md active:scale-[0.98] transition disabled:opacity-60"
+            style={{ backgroundImage: "linear-gradient(135deg, hsl(152 70% 48%), hsl(142 72% 38%))" }}
+            className="rounded-xl px-4 py-3 flex items-center justify-center gap-2 text-sm font-bold !text-white shadow-lg shadow-emerald-900/20 border border-white/20 active:scale-[0.98] transition disabled:opacity-60"
           >
             {addToMeals.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-            {(scan as any).added_at ? "Added" : "I ate this"}
+            {(scan as any).added_at ? "Добавлено" : "Я съел(а) это"}
           </button>
           <button
             onClick={() => navigate("/scan")}
-            style={{ backgroundImage: "linear-gradient(90deg, hsl(0 75% 60%), hsl(350 70% 48%))" }}
-            className="rounded-xl px-4 py-3 flex items-center justify-center gap-2 text-sm font-bold !text-white shadow-md active:scale-[0.98] transition"
+            style={{ backgroundImage: "linear-gradient(135deg, hsl(0 80% 62%), hsl(350 75% 50%))" }}
+            className="rounded-xl px-4 py-3 flex items-center justify-center gap-2 text-sm font-bold !text-white shadow-lg shadow-rose-900/20 border border-white/20 active:scale-[0.98] transition"
           >
-            <X className="w-4 h-4" /> Dismiss
+            <X className="w-4 h-4" /> Пропустить
           </button>
         </motion.div>
 
