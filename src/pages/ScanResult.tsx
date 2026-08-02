@@ -226,14 +226,16 @@ const ScanResult = () => {
           <button
             onClick={handleAddClick}
             disabled={addToMeals.isPending || !!(scan as any).added_at}
-            className="glass-card p-3 flex items-center justify-center gap-2 text-sm font-bold text-white bg-gradient-to-r from-emerald-500 to-green-600 disabled:opacity-60"
+            style={{ backgroundImage: "linear-gradient(90deg, hsl(152 65% 45%), hsl(142 70% 36%))" }}
+            className="rounded-xl px-4 py-3 flex items-center justify-center gap-2 text-sm font-bold !text-white shadow-md active:scale-[0.98] transition disabled:opacity-60"
           >
             {addToMeals.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
             {(scan as any).added_at ? "Added" : "I ate this"}
           </button>
           <button
             onClick={() => navigate("/scan")}
-            className="glass-card p-3 flex items-center justify-center gap-2 text-sm font-bold text-white bg-gradient-to-r from-rose-500 to-red-600"
+            style={{ backgroundImage: "linear-gradient(90deg, hsl(0 75% 60%), hsl(350 70% 48%))" }}
+            className="rounded-xl px-4 py-3 flex items-center justify-center gap-2 text-sm font-bold !text-white shadow-md active:scale-[0.98] transition"
           >
             <X className="w-4 h-4" /> Dismiss
           </button>
