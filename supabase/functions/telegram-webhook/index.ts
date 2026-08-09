@@ -181,28 +181,61 @@ Deno.serve(async (req) => {
   let update: any;
   try { update = await req.json(); } catch { return new Response(JSON.stringify({ ok: true }), { status: 200 }); }
 
+  const ok = () => new Response(JSON.stringify({ ok: true }), { headers: { "Content-Type": "application/json" } });
+
+  // language selection button
+  const cq = update.callback_query;
+  if (cq?.data?.startsWith("lang:")) {
+    const lang = (cq.data.split(":")[1] === "en" ? "en" : "ru") as Lang;
+    const cid = cq.message?.chat?.id;
+    await answerCallback(cq.id);
+    if (cid) {
+      await setLang(cid, lang);
+      await sendMessage(cid, T[lang].saved);
+      await sendMessage(cid, T[lang].help);
+    }
+    return ok();
+  }
+
   const msg = update.message ?? update.edited_message;
   const chatId = msg?.chat?.id;
-  if (!chatId) return new Response(JSON.stringify({ ok: true }));
+  if (!chatId) return ok();
+
+  let lang = await getLang(chatId);
 
   try {
     const photos = msg.photo as Array<{ file_id: string }> | undefined;
     const text: string | undefined = msg.text ?? msg.caption;
 
+    // explicit language command
+    if (text && (text.startsWith("/language") || text.startsWith("/lang"))) {
+      await sendMessage(chatId, T[lang ?? "ru"].choose, LANG_KEYBOARD);
+      return ok();
+    }
+
+    // first contact — ask for language
+    if (!lang) {
+      await sendMessage(chatId, T.ru.choose, LANG_KEYBOARD);
+      if (!photos?.length) return ok();
+      lang = "ru";
+    }
+
+    const t = T[lang];
+
     if (!photos?.length) {
       if (!text || text.startsWith("/start") || text.startsWith("/help")) {
-        await sendMessage(chatId, HELP);
-        return new Response(JSON.stringify({ ok: true }));
+        await sendMessage(chatId, t.help);
+        return ok();
       }
     }
 
-    await sendMessage(chatId, "🔍 Анализирую…");
+    await sendMessage(chatId, t.analyzing);
 
     let parsed: any;
     if (photos?.length) {
       const best = photos[photos.length - 1];
       const { base64, mimeType } = await downloadPhoto(best.file_id);
-      parsed = await visionAnalyze(base64, mimeType);
+      parsed = await visionAnalyze(base64, mimeType, lang);
     } else {
       const r = await fetch(AI, {
         method: "POST",
@@ -211,7 +244,7 @@ Deno.serve(async (req) => {
           model: "google/gemini-2.5-flash",
           messages: [
             { role: "system", content: "You estimate nutrition of meals from text descriptions. Output JSON only." },
-            { role: "user", content: `Блюдо: ${text}. Return JSON:
+            { role: "user", content: `${t.textPrompt(text!)} Return JSON (dish_name and portion_estimate in ${lang === "ru" ? "Russian" : "English"}):
 {"dish_name":"","portion_estimate":"","ingredients":["..."],
 "nutrition":{"calories":0,"protein_g":0,"carbs_g":0,"sugar_g":0,"fiber_g":0,"fat_g":0,"saturated_fat_g":0,"salt_g":0},
 "nova_group":1,"additives":[]}` },
@@ -226,7 +259,7 @@ Deno.serve(async (req) => {
 
     const product: NormalizedProduct = {
       source: "ai_vision",
-      product_name: parsed.dish_name || "Блюдо",
+      product_name: parsed.dish_name || t.dish,
       brand: null, image_url: null, barcode: null,
       nutrition: parsed.nutrition || {},
       ingredients: parsed.ingredients || [],
@@ -235,35 +268,35 @@ Deno.serve(async (req) => {
     };
 
     const goal: NutritionGoal = "balanced";
-    const { universal, goalFit, insights } = await analyzeProduct(product, goal, "ru");
+    const { universal, goalFit, insights } = await analyzeProduct(product, goal, lang);
     const n = product.nutrition;
 
     const lines: string[] = [
       `${scoreEmoji(universal.score)} <b>${esc(product.product_name)}</b>`,
-      parsed.portion_estimate ? `Порция: ${esc(parsed.portion_estimate)}` : "",
+      parsed.portion_estimate ? `${t.portion}: ${esc(parsed.portion_estimate)}` : "",
       "",
       `<b>Health Score:</b> ${universal.score}/100 (${esc(universal.category_label)})`,
       `<b>Goal Fit:</b> ${goalFit}/100`,
       "",
-      `🔥 ${Math.round(n.calories ?? 0)} ккал  •  Б ${Math.round(n.protein_g ?? 0)}г  •  У ${Math.round(n.carbs_g ?? 0)}г  •  Ж ${Math.round(n.fat_g ?? 0)}г`,
+      `🔥 ${Math.round(n.calories ?? 0)} ${t.kcal}  •  ${t.p} ${Math.round(n.protein_g ?? 0)}g  •  ${t.c} ${Math.round(n.carbs_g ?? 0)}g  •  ${t.f} ${Math.round(n.fat_g ?? 0)}g`,
     ];
 
     if (insights.whats_good?.length) {
-      lines.push("", "<b>✅ Плюсы</b>", ...insights.whats_good.slice(0, 4).map((s) => `• ${esc(s)}`));
+      lines.push("", t.good, ...insights.whats_good.slice(0, 4).map((s) => `• ${esc(s)}`));
     }
     if (insights.things_to_know?.length) {
-      lines.push("", "<b>ℹ️ Стоит знать</b>", ...insights.things_to_know.slice(0, 3).map((s) => `• ${esc(s)}`));
+      lines.push("", t.know, ...insights.things_to_know.slice(0, 3).map((s) => `• ${esc(s)}`));
     }
     if (insights.personalized_recommendation) {
       lines.push("", `💡 ${esc(insights.personalized_recommendation)}`);
     }
-    lines.push("", "<i>Оценка приблизительная и не является медицинской рекомендацией.</i>");
+    lines.push("", t.disclaimer);
 
     await sendMessage(chatId, lines.filter((l) => l !== undefined).join("\n"));
   } catch (e) {
     console.error("telegram-webhook error", e);
-    await sendMessage(chatId, "😕 Не удалось проанализировать. Попробуй ещё раз — лучше при хорошем освещении и крупным планом.");
+    await sendMessage(chatId, T[lang ?? "ru"].error);
   }
 
-  return new Response(JSON.stringify({ ok: true }), { headers: { "Content-Type": "application/json" } });
+  return ok();
 });
