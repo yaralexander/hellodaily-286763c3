@@ -134,7 +134,7 @@ async function downloadPhoto(fileId: string): Promise<{ base64: string; mimeType
   return { base64: btoa(bin), mimeType };
 }
 
-async function visionAnalyze(base64: string, mimeType: string) {
+async function visionAnalyze(base64: string, mimeType: string, lang: "ru" | "en" = "ru") {
   const r = await fetch(AI, {
     method: "POST",
     headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
@@ -145,7 +145,7 @@ async function visionAnalyze(base64: string, mimeType: string) {
         {
           role: "user",
           content: [
-            { type: "text", text: `Identify and estimate. Return JSON:
+            { type: "text", text: `Identify and estimate. dish_name and portion_estimate must be in ${lang === "ru" ? "Russian" : "English"}. Return JSON:
 {"dish_name":"","portion_estimate":"","ingredients":["..."],
 "nutrition":{"calories":0,"protein_g":0,"carbs_g":0,"sugar_g":0,"fiber_g":0,"fat_g":0,"saturated_fat_g":0,"salt_g":0},
 "nova_group":1,"additives":[]}` },
