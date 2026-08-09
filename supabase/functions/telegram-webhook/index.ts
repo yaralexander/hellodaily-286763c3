@@ -1,3 +1,4 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { analyzeProduct } from "../_shared/analyzePipeline.ts";
 import type { NormalizedProduct } from "../_shared/foodAdapters.ts";
 import type { NutritionGoal } from "../_shared/goalFit.ts";
@@ -29,14 +30,89 @@ function safeEqual(a: string | null, b: string): boolean {
   return d === 0;
 }
 
-async function sendMessage(chatId: number, text: string) {
+async function sendMessage(chatId: number, text: string, replyMarkup?: unknown) {
   const r = await fetch(`${GATEWAY}/sendMessage`, {
     method: "POST",
     headers: tgHeaders(),
-    body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML" }),
+    body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML", reply_markup: replyMarkup }),
   });
   if (!r.ok) console.error("sendMessage failed", r.status, await r.text());
 }
+
+async function answerCallback(id: string) {
+  await fetch(`${GATEWAY}/answerCallbackQuery`, {
+    method: "POST", headers: tgHeaders(), body: JSON.stringify({ callback_query_id: id }),
+  });
+}
+
+// ---- language ----
+type Lang = "ru" | "en";
+
+const supabase = createClient(
+  Deno.env.get("SUPABASE_URL")!,
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+);
+
+async function getLang(chatId: number): Promise<Lang | null> {
+  const { data } = await supabase
+    .from("telegram_bot_settings").select("lang").eq("chat_id", chatId).maybeSingle();
+  return (data?.lang as Lang) ?? null;
+}
+
+async function setLang(chatId: number, lang: Lang) {
+  await supabase.from("telegram_bot_settings")
+    .upsert({ chat_id: chatId, lang, updated_at: new Date().toISOString() }, { onConflict: "chat_id" });
+}
+
+const LANG_KEYBOARD = {
+  inline_keyboard: [[
+    { text: "🇷🇺 Русский", callback_data: "lang:ru" },
+    { text: "🇬🇧 English", callback_data: "lang:en" },
+  ]],
+};
+
+const T = {
+  ru: {
+    choose: "🌍 Выбери язык бота:\n\nChoose your language:",
+    saved: "✅ Язык переключён на русский.",
+    help: `👋 Привет! Я бот <b>Hello Daily</b>.
+
+📸 Отправь мне <b>фото еды</b> — я оценю блюдо так же, как на сайте: Health Score, калории, БЖУ и советы.
+✍️ Можно и просто описать блюдо текстом.
+🌍 /language — сменить язык.
+
+⚠️ Оценки приблизительные и не являются медицинской рекомендацией.`,
+    analyzing: "🔍 Анализирую…",
+    error: "😕 Не удалось проанализировать. Попробуй ещё раз — лучше при хорошем освещении и крупным планом.",
+    dish: "Блюдо",
+    portion: "Порция",
+    good: "<b>✅ Плюсы</b>",
+    know: "<b>ℹ️ Стоит знать</b>",
+    kcal: "ккал", p: "Б", c: "У", f: "Ж",
+    disclaimer: "<i>Оценка приблизительная и не является медицинской рекомендацией.</i>",
+    textPrompt: (t: string) => `Блюдо: ${t}.`,
+  },
+  en: {
+    choose: "🌍 Choose your language:\n\nВыбери язык бота:",
+    saved: "✅ Language switched to English.",
+    help: `👋 Hi! I'm the <b>Hello Daily</b> bot.
+
+📸 Send me a <b>photo of your food</b> — I'll rate it just like on the website: Health Score, calories, macros and tips.
+✍️ You can also just describe the dish in text.
+🌍 /language — change language.
+
+⚠️ Estimates are approximate and not medical advice.`,
+    analyzing: "🔍 Analyzing…",
+    error: "😕 Couldn't analyze that. Please try again — good lighting and a close-up help.",
+    dish: "Dish",
+    portion: "Portion",
+    good: "<b>✅ What's good</b>",
+    know: "<b>ℹ️ Things to know</b>",
+    kcal: "kcal", p: "P", c: "C", f: "F",
+    disclaimer: "<i>This estimate is approximate and not medical advice.</i>",
+    textPrompt: (t: string) => `Dish: ${t}.`,
+  },
+} as const;
 
 async function downloadPhoto(fileId: string): Promise<{ base64: string; mimeType: string }> {
   const fr = await fetch(`${GATEWAY}/getFile`, {
@@ -92,13 +168,6 @@ function esc(s: string) {
 function scoreEmoji(s: number) {
   return s >= 80 ? "🟢" : s >= 60 ? "🟡" : s >= 40 ? "🟠" : "🔴";
 }
-
-const HELP = `👋 Привет! Я бот <b>Hello Daily</b>.
-
-📸 Отправь мне <b>фото еды</b> — я оценю блюдо так же, как на сайте: Health Score, калории, БЖУ и советы.
-✍️ Можно и просто описать блюдо текстом.
-
-⚠️ Оценки приблизительные и не являются медицинской рекомендацией.`;
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") return new Response("Method not allowed", { status: 405 });
