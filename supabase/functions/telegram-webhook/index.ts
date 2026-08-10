@@ -53,13 +53,13 @@ const supabase = createClient(
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
 );
 
-type Settings = { lang: Lang; goal: NutritionGoal } | null;
+type Settings = { lang: Lang; goal: NutritionGoal | null } | null;
 
 async function getSettings(chatId: number): Promise<Settings> {
   const { data } = await supabase
     .from("telegram_bot_settings").select("lang, goal").eq("chat_id", chatId).maybeSingle();
   if (!data) return null;
-  return { lang: (data.lang as Lang) ?? "ru", goal: (data.goal as NutritionGoal) ?? "balanced" };
+  return { lang: (data.lang as Lang) ?? "ru", goal: (data.goal as NutritionGoal) ?? null };
 }
 
 async function saveSettings(chatId: number, patch: { lang?: Lang; goal?: NutritionGoal }) {
