@@ -443,21 +443,21 @@ export type Database = {
         Row: {
           chat_id: number
           created_at: string
-          goal: string
+          goal: string | null
           lang: string
           updated_at: string
         }
         Insert: {
           chat_id: number
           created_at?: string
-          goal?: string
+          goal?: string | null
           lang?: string
           updated_at?: string
         }
         Update: {
           chat_id?: number
           created_at?: string
-          goal?: string
+          goal?: string | null
           lang?: string
           updated_at?: string
         }
