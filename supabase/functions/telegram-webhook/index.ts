@@ -53,15 +53,18 @@ const supabase = createClient(
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
 );
 
-async function getLang(chatId: number): Promise<Lang | null> {
+type Settings = { lang: Lang; goal: NutritionGoal } | null;
+
+async function getSettings(chatId: number): Promise<Settings> {
   const { data } = await supabase
-    .from("telegram_bot_settings").select("lang").eq("chat_id", chatId).maybeSingle();
-  return (data?.lang as Lang) ?? null;
+    .from("telegram_bot_settings").select("lang, goal").eq("chat_id", chatId).maybeSingle();
+  if (!data) return null;
+  return { lang: (data.lang as Lang) ?? "ru", goal: (data.goal as NutritionGoal) ?? "balanced" };
 }
 
-async function setLang(chatId: number, lang: Lang) {
+async function saveSettings(chatId: number, patch: { lang?: Lang; goal?: NutritionGoal }) {
   await supabase.from("telegram_bot_settings")
-    .upsert({ chat_id: chatId, lang, updated_at: new Date().toISOString() }, { onConflict: "chat_id" });
+    .upsert({ chat_id: chatId, ...patch, updated_at: new Date().toISOString() }, { onConflict: "chat_id" });
 }
 
 const LANG_KEYBOARD = {
@@ -70,6 +73,39 @@ const LANG_KEYBOARD = {
     { text: "🇬🇧 English", callback_data: "lang:en" },
   ]],
 };
+
+// ---- goals (same list & scoring as the website) ----
+const GOALS: { id: NutritionGoal; emoji: string; ru: string; en: string }[] = [
+  { id: "balanced", emoji: "⚖️", ru: "Сбалансированное питание", en: "Balanced Nutrition" },
+  { id: "weight_loss", emoji: "🔥", ru: "Снижение веса", en: "Weight Loss" },
+  { id: "muscle_gain", emoji: "💪", ru: "Набор мышц", en: "Muscle Gain" },
+  { id: "high_protein", emoji: "🥩", ru: "Много белка", en: "High Protein" },
+  { id: "keto", emoji: "🥑", ru: "Кето", en: "Keto Diet" },
+  { id: "low_carb", emoji: "🌾", ru: "Мало углеводов", en: "Low Carb" },
+  { id: "heart_health", emoji: "❤️", ru: "Здоровье сердца", en: "Heart Health" },
+  { id: "diabetes_friendly", emoji: "🩺", ru: "При диабете", en: "Diabetes Friendly" },
+  { id: "mediterranean", emoji: "🫒", ru: "Средиземноморская", en: "Mediterranean" },
+  { id: "high_fiber", emoji: "🌿", ru: "Много клетчатки", en: "High Fiber" },
+  { id: "whole_food", emoji: "🥗", ru: "Натуральные продукты", en: "Whole Food" },
+  { id: "low_sodium", emoji: "🧂", ru: "Мало соли", en: "Low Sodium" },
+  { id: "plant_based", emoji: "🌱", ru: "Растительное", en: "Plant Based" },
+];
+
+function goalLabel(id: NutritionGoal, lang: Lang) {
+  const g = GOALS.find((x) => x.id === id) ?? GOALS[0];
+  return `${g.emoji} ${lang === "ru" ? g.ru : g.en}`;
+}
+
+function goalKeyboard(lang: Lang) {
+  const rows: unknown[][] = [];
+  for (let i = 0; i < GOALS.length; i += 2) {
+    rows.push(GOALS.slice(i, i + 2).map((g) => ({
+      text: `${g.emoji} ${lang === "ru" ? g.ru : g.en}`,
+      callback_data: `goal:${g.id}`,
+    })));
+  }
+  return { inline_keyboard: rows };
+}
 
 const T = {
   ru: {
