@@ -394,7 +394,7 @@ Deno.serve(async (req) => {
       additives: parsed.additives || [],
     };
 
-    const goal: NutritionGoal = "balanced";
+    const goal: NutritionGoal = settings.goal;
     const { universal, goalFit, insights } = await analyzeProduct(product, goal, lang);
     const n = product.nutrition;
 
