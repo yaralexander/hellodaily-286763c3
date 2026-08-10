@@ -1,0 +1,1 @@
+ALTER TABLE public.telegram_bot_settings ADD COLUMN IF NOT EXISTS goal text NOT NULL DEFAULT 'balanced';
