@@ -109,19 +109,48 @@ function goalKeyboard(lang: Lang) {
 
 const T = {
   ru: {
-    choose: "🌍 Выбери язык бота:\n\nChoose your language:",
-    saved: "✅ Язык переключён на русский.",
+    choose: "🌍 <b>Шаг 1 из 2.</b> Выбери язык бота:\n\nChoose your language:",
+    saved: "✅ Язык: Русский.",
+    chooseGoal: `🎯 <b>Шаг 2 из 2.</b> Выбери свою цель питания.
+
+От неё зависит <b>Goal Fit</b> — насколько продукт подходит именно тебе.`,
+    goalSaved: (g: string) => `✅ Цель: <b>${g}</b>\n\nМожно поменять командой /goal.`,
     help: `👋 Привет! Я бот <b>Hello Daily</b>.
 
-📸 Отправь мне <b>фото еды</b> — я оценю блюдо так же, как на сайте: Health Score, калории, БЖУ и советы.
+📸 Отправь мне <b>фото еды</b> — я оценю блюдо так же, как на сайте: Health Score, Goal Fit, калории, БЖУ и советы.
 ✍️ Можно и просто описать блюдо текстом.
+🎯 /goal — сменить цель питания.
 🌍 /language — сменить язык.
+📊 /criteria — как я ставлю оценку.
+
+⚠️ Оценки приблизительные и не являются медицинской рекомендацией.`,
+    criteria: `📊 <b>Как я ставлю оценку</b> (та же логика, что на сайте)
+
+<b>Health Score 0–100</b> — качество продукта само по себе:
+• 🍬 сахар и добавленный сахар
+• 🧂 соль / натрий
+• 🥓 насыщенные и транс-жиры
+• 🔥 калорийность на 100 г
+• 🌿 клетчатка, белок, витамины и минералы
+• 🏭 степень переработки (NOVA 1–4) и добавки E-***
+• 🧪 качество ингредиентов (подсластители, красители, масла)
+
+🟢 80–100 отлично · 🟡 60–79 хорошо · 🟠 40–59 средне · 🔴 0–39 лучше избегать
+
+<b>Goal Fit 0–100</b> — насколько продукт подходит <i>твоей цели</i>:
+• Снижение веса — меньше калорий и сахара, больше клетчатки и белка
+• Набор мышц / много белка — доля белка на калорию
+• Кето / мало углеводов — чистые углеводы и сахар
+• Здоровье сердца — насыщенные жиры, натрий, клетчатка
+• При диабете — сахар, чистые углеводы, клетчатка
+• Средиземноморская, много клетчатки, натуральные продукты, мало соли, растительное — по своим критериям
 
 ⚠️ Оценки приблизительные и не являются медицинской рекомендацией.`,
     analyzing: "🔍 Анализирую…",
     error: "😕 Не удалось проанализировать. Попробуй ещё раз — лучше при хорошем освещении и крупным планом.",
     dish: "Блюдо",
     portion: "Порция",
+    goalLine: "Цель",
     good: "<b>✅ Плюсы</b>",
     know: "<b>ℹ️ Стоит знать</b>",
     kcal: "ккал", p: "Б", c: "У", f: "Ж",
@@ -129,19 +158,48 @@ const T = {
     textPrompt: (t: string) => `Блюдо: ${t}.`,
   },
   en: {
-    choose: "🌍 Choose your language:\n\nВыбери язык бота:",
-    saved: "✅ Language switched to English.",
+    choose: "🌍 <b>Step 1 of 2.</b> Choose your language:\n\nВыбери язык бота:",
+    saved: "✅ Language: English.",
+    chooseGoal: `🎯 <b>Step 2 of 2.</b> Pick your nutrition goal.
+
+It drives your <b>Goal Fit</b> — how well a food matches you personally.`,
+    goalSaved: (g: string) => `✅ Goal: <b>${g}</b>\n\nChange it anytime with /goal.`,
     help: `👋 Hi! I'm the <b>Hello Daily</b> bot.
 
-📸 Send me a <b>photo of your food</b> — I'll rate it just like on the website: Health Score, calories, macros and tips.
+📸 Send me a <b>photo of your food</b> — I'll rate it just like on the website: Health Score, Goal Fit, calories, macros and tips.
 ✍️ You can also just describe the dish in text.
+🎯 /goal — change your nutrition goal.
 🌍 /language — change language.
+📊 /criteria — how I score food.
+
+⚠️ Estimates are approximate and not medical advice.`,
+    criteria: `📊 <b>How I score food</b> (same logic as the website)
+
+<b>Health Score 0–100</b> — the quality of the food itself:
+• 🍬 sugar and added sugar
+• 🧂 salt / sodium
+• 🥓 saturated and trans fats
+• 🔥 calorie density per 100 g
+• 🌿 fiber, protein, vitamins and minerals
+• 🏭 processing level (NOVA 1–4) and E-additives
+• 🧪 ingredient quality (sweeteners, colorings, oils)
+
+🟢 80–100 excellent · 🟡 60–79 good · 🟠 40–59 moderate · 🔴 0–39 avoid
+
+<b>Goal Fit 0–100</b> — how well it matches <i>your goal</i>:
+• Weight loss — fewer calories and sugar, more fiber and protein
+• Muscle gain / high protein — protein per calorie
+• Keto / low carb — net carbs and sugar
+• Heart health — saturated fat, sodium, fiber
+• Diabetes friendly — sugar, net carbs, fiber
+• Mediterranean, high fiber, whole food, low sodium, plant based — each by its own criteria
 
 ⚠️ Estimates are approximate and not medical advice.`,
     analyzing: "🔍 Analyzing…",
     error: "😕 Couldn't analyze that. Please try again — good lighting and a close-up help.",
     dish: "Dish",
     portion: "Portion",
+    goalLine: "Goal",
     good: "<b>✅ What's good</b>",
     know: "<b>ℹ️ Things to know</b>",
     kcal: "kcal", p: "P", c: "C", f: "F",
