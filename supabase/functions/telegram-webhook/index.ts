@@ -63,8 +63,9 @@ async function getSettings(chatId: number): Promise<Settings> {
 }
 
 async function saveSettings(chatId: number, patch: { lang?: Lang; goal?: NutritionGoal }) {
-  await supabase.from("telegram_bot_settings")
+  const { error } = await supabase.from("telegram_bot_settings")
     .upsert({ chat_id: chatId, ...patch, updated_at: new Date().toISOString() }, { onConflict: "chat_id" });
+  if (error) console.error("saveSettings failed", chatId, patch, error.message);
 }
 
 const LANG_KEYBOARD = {

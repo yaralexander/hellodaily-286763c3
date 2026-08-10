@@ -1,0 +1,1 @@
+GRANT ALL ON public.telegram_bot_settings TO service_role;
