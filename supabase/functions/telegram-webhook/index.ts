@@ -403,7 +403,7 @@ Deno.serve(async (req) => {
       parsed.portion_estimate ? `${t.portion}: ${esc(parsed.portion_estimate)}` : "",
       "",
       `<b>Health Score:</b> ${universal.score}/100 (${esc(universal.category_label)})`,
-      `<b>Goal Fit:</b> ${goalFit}/100`,
+      `<b>Goal Fit:</b> ${goalFit}/100 — ${esc(goalLabel(goal, lang))}`,
       "",
       `🔥 ${Math.round(n.calories ?? 0)} ${t.kcal}  •  ${t.p} ${Math.round(n.protein_g ?? 0)}g  •  ${t.c} ${Math.round(n.carbs_g ?? 0)}g  •  ${t.f} ${Math.round(n.fat_g ?? 0)}g`,
     ];
