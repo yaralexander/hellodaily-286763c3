@@ -277,16 +277,35 @@ Deno.serve(async (req) => {
 
   const ok = () => new Response(JSON.stringify({ ok: true }), { headers: { "Content-Type": "application/json" } });
 
-  // language selection button
+  // inline keyboard buttons
   const cq = update.callback_query;
-  if (cq?.data?.startsWith("lang:")) {
-    const lang = (cq.data.split(":")[1] === "en" ? "en" : "ru") as Lang;
+  if (cq?.data) {
     const cid = cq.message?.chat?.id;
     await answerCallback(cq.id);
-    if (cid) {
-      await setLang(cid, lang);
+    if (!cid) return ok();
+
+    if (cq.data.startsWith("lang:")) {
+      const lang = (cq.data.split(":")[1] === "en" ? "en" : "ru") as Lang;
+      await saveSettings(cid, { lang });
+      const s = await getSettings(cid);
       await sendMessage(cid, T[lang].saved);
+      if (!s?.goal) {
+        await sendMessage(cid, T[lang].chooseGoal, goalKeyboard(lang));
+      } else {
+        await sendMessage(cid, T[lang].help);
+      }
+      return ok();
+    }
+
+    if (cq.data.startsWith("goal:")) {
+      const id = cq.data.split(":")[1] as NutritionGoal;
+      const goal = GOALS.some((g) => g.id === id) ? id : "balanced";
+      const s = await getSettings(cid);
+      const lang = s?.lang ?? "ru";
+      await saveSettings(cid, { goal });
+      await sendMessage(cid, T[lang].goalSaved(goalLabel(goal, lang)));
       await sendMessage(cid, T[lang].help);
+      return ok();
     }
     return ok();
   }
@@ -295,26 +314,40 @@ Deno.serve(async (req) => {
   const chatId = msg?.chat?.id;
   if (!chatId) return ok();
 
-  let lang = await getLang(chatId);
+  const settings = await getSettings(chatId);
+  let lang: Lang | null = settings?.lang ?? null;
 
   try {
     const photos = msg.photo as Array<{ file_id: string }> | undefined;
     const text: string | undefined = msg.text ?? msg.caption;
 
-    // explicit language command
+    // explicit commands
     if (text && (text.startsWith("/language") || text.startsWith("/lang"))) {
       await sendMessage(chatId, T[lang ?? "ru"].choose, LANG_KEYBOARD);
       return ok();
     }
+    if (text && text.startsWith("/goal")) {
+      await sendMessage(chatId, T[lang ?? "ru"].chooseGoal, goalKeyboard(lang ?? "ru"));
+      return ok();
+    }
+    if (text && text.startsWith("/criteria")) {
+      await sendMessage(chatId, T[lang ?? "ru"].criteria);
+      return ok();
+    }
 
-    // first contact — ask for language
+    // onboarding — step 1: language
     if (!lang) {
       await sendMessage(chatId, T.ru.choose, LANG_KEYBOARD);
-      if (!photos?.length) return ok();
-      lang = "ru";
+      return ok();
+    }
+    // onboarding — step 2: goal
+    if (!settings?.goal) {
+      await sendMessage(chatId, T[lang].chooseGoal, goalKeyboard(lang));
+      return ok();
     }
 
     const t = T[lang];
+
 
     if (!photos?.length) {
       if (!text || text.startsWith("/start") || text.startsWith("/help")) {
