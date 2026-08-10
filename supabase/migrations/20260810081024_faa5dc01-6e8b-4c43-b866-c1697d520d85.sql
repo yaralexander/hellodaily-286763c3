@@ -1,0 +1,1 @@
+ALTER TABLE public.telegram_bot_settings ALTER COLUMN goal DROP NOT NULL; ALTER TABLE public.telegram_bot_settings ALTER COLUMN goal DROP DEFAULT; UPDATE public.telegram_bot_settings SET goal = NULL WHERE goal = 'balanced';

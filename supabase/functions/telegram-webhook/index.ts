@@ -53,15 +53,18 @@ const supabase = createClient(
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
 );
 
-async function getLang(chatId: number): Promise<Lang | null> {
+type Settings = { lang: Lang; goal: NutritionGoal | null } | null;
+
+async function getSettings(chatId: number): Promise<Settings> {
   const { data } = await supabase
-    .from("telegram_bot_settings").select("lang").eq("chat_id", chatId).maybeSingle();
-  return (data?.lang as Lang) ?? null;
+    .from("telegram_bot_settings").select("lang, goal").eq("chat_id", chatId).maybeSingle();
+  if (!data) return null;
+  return { lang: (data.lang as Lang) ?? "ru", goal: (data.goal as NutritionGoal) ?? null };
 }
 
-async function setLang(chatId: number, lang: Lang) {
+async function saveSettings(chatId: number, patch: { lang?: Lang; goal?: NutritionGoal }) {
   await supabase.from("telegram_bot_settings")
-    .upsert({ chat_id: chatId, lang, updated_at: new Date().toISOString() }, { onConflict: "chat_id" });
+    .upsert({ chat_id: chatId, ...patch, updated_at: new Date().toISOString() }, { onConflict: "chat_id" });
 }
 
 const LANG_KEYBOARD = {
@@ -71,21 +74,83 @@ const LANG_KEYBOARD = {
   ]],
 };
 
+// ---- goals (same list & scoring as the website) ----
+const GOALS: { id: NutritionGoal; emoji: string; ru: string; en: string }[] = [
+  { id: "balanced", emoji: "⚖️", ru: "Сбалансированное питание", en: "Balanced Nutrition" },
+  { id: "weight_loss", emoji: "🔥", ru: "Снижение веса", en: "Weight Loss" },
+  { id: "muscle_gain", emoji: "💪", ru: "Набор мышц", en: "Muscle Gain" },
+  { id: "high_protein", emoji: "🥩", ru: "Много белка", en: "High Protein" },
+  { id: "keto", emoji: "🥑", ru: "Кето", en: "Keto Diet" },
+  { id: "low_carb", emoji: "🌾", ru: "Мало углеводов", en: "Low Carb" },
+  { id: "heart_health", emoji: "❤️", ru: "Здоровье сердца", en: "Heart Health" },
+  { id: "diabetes_friendly", emoji: "🩺", ru: "При диабете", en: "Diabetes Friendly" },
+  { id: "mediterranean", emoji: "🫒", ru: "Средиземноморская", en: "Mediterranean" },
+  { id: "high_fiber", emoji: "🌿", ru: "Много клетчатки", en: "High Fiber" },
+  { id: "whole_food", emoji: "🥗", ru: "Натуральные продукты", en: "Whole Food" },
+  { id: "low_sodium", emoji: "🧂", ru: "Мало соли", en: "Low Sodium" },
+  { id: "plant_based", emoji: "🌱", ru: "Растительное", en: "Plant Based" },
+];
+
+function goalLabel(id: NutritionGoal, lang: Lang) {
+  const g = GOALS.find((x) => x.id === id) ?? GOALS[0];
+  return `${g.emoji} ${lang === "ru" ? g.ru : g.en}`;
+}
+
+function goalKeyboard(lang: Lang) {
+  const rows: unknown[][] = [];
+  for (let i = 0; i < GOALS.length; i += 2) {
+    rows.push(GOALS.slice(i, i + 2).map((g) => ({
+      text: `${g.emoji} ${lang === "ru" ? g.ru : g.en}`,
+      callback_data: `goal:${g.id}`,
+    })));
+  }
+  return { inline_keyboard: rows };
+}
+
 const T = {
   ru: {
-    choose: "🌍 Выбери язык бота:\n\nChoose your language:",
-    saved: "✅ Язык переключён на русский.",
+    choose: "🌍 <b>Шаг 1 из 2.</b> Выбери язык бота:\n\nChoose your language:",
+    saved: "✅ Язык: Русский.",
+    chooseGoal: `🎯 <b>Шаг 2 из 2.</b> Выбери свою цель питания.
+
+От неё зависит <b>Goal Fit</b> — насколько продукт подходит именно тебе.`,
+    goalSaved: (g: string) => `✅ Цель: <b>${g}</b>\n\nМожно поменять командой /goal.`,
     help: `👋 Привет! Я бот <b>Hello Daily</b>.
 
-📸 Отправь мне <b>фото еды</b> — я оценю блюдо так же, как на сайте: Health Score, калории, БЖУ и советы.
+📸 Отправь мне <b>фото еды</b> — я оценю блюдо так же, как на сайте: Health Score, Goal Fit, калории, БЖУ и советы.
 ✍️ Можно и просто описать блюдо текстом.
+🎯 /goal — сменить цель питания.
 🌍 /language — сменить язык.
+📊 /criteria — как я ставлю оценку.
+
+⚠️ Оценки приблизительные и не являются медицинской рекомендацией.`,
+    criteria: `📊 <b>Как я ставлю оценку</b> (та же логика, что на сайте)
+
+<b>Health Score 0–100</b> — качество продукта само по себе:
+• 🍬 сахар и добавленный сахар
+• 🧂 соль / натрий
+• 🥓 насыщенные и транс-жиры
+• 🔥 калорийность на 100 г
+• 🌿 клетчатка, белок, витамины и минералы
+• 🏭 степень переработки (NOVA 1–4) и добавки E-***
+• 🧪 качество ингредиентов (подсластители, красители, масла)
+
+🟢 80–100 отлично · 🟡 60–79 хорошо · 🟠 40–59 средне · 🔴 0–39 лучше избегать
+
+<b>Goal Fit 0–100</b> — насколько продукт подходит <i>твоей цели</i>:
+• Снижение веса — меньше калорий и сахара, больше клетчатки и белка
+• Набор мышц / много белка — доля белка на калорию
+• Кето / мало углеводов — чистые углеводы и сахар
+• Здоровье сердца — насыщенные жиры, натрий, клетчатка
+• При диабете — сахар, чистые углеводы, клетчатка
+• Средиземноморская, много клетчатки, натуральные продукты, мало соли, растительное — по своим критериям
 
 ⚠️ Оценки приблизительные и не являются медицинской рекомендацией.`,
     analyzing: "🔍 Анализирую…",
     error: "😕 Не удалось проанализировать. Попробуй ещё раз — лучше при хорошем освещении и крупным планом.",
     dish: "Блюдо",
     portion: "Порция",
+    goalLine: "Цель",
     good: "<b>✅ Плюсы</b>",
     know: "<b>ℹ️ Стоит знать</b>",
     kcal: "ккал", p: "Б", c: "У", f: "Ж",
@@ -93,19 +158,48 @@ const T = {
     textPrompt: (t: string) => `Блюдо: ${t}.`,
   },
   en: {
-    choose: "🌍 Choose your language:\n\nВыбери язык бота:",
-    saved: "✅ Language switched to English.",
+    choose: "🌍 <b>Step 1 of 2.</b> Choose your language:\n\nВыбери язык бота:",
+    saved: "✅ Language: English.",
+    chooseGoal: `🎯 <b>Step 2 of 2.</b> Pick your nutrition goal.
+
+It drives your <b>Goal Fit</b> — how well a food matches you personally.`,
+    goalSaved: (g: string) => `✅ Goal: <b>${g}</b>\n\nChange it anytime with /goal.`,
     help: `👋 Hi! I'm the <b>Hello Daily</b> bot.
 
-📸 Send me a <b>photo of your food</b> — I'll rate it just like on the website: Health Score, calories, macros and tips.
+📸 Send me a <b>photo of your food</b> — I'll rate it just like on the website: Health Score, Goal Fit, calories, macros and tips.
 ✍️ You can also just describe the dish in text.
+🎯 /goal — change your nutrition goal.
 🌍 /language — change language.
+📊 /criteria — how I score food.
+
+⚠️ Estimates are approximate and not medical advice.`,
+    criteria: `📊 <b>How I score food</b> (same logic as the website)
+
+<b>Health Score 0–100</b> — the quality of the food itself:
+• 🍬 sugar and added sugar
+• 🧂 salt / sodium
+• 🥓 saturated and trans fats
+• 🔥 calorie density per 100 g
+• 🌿 fiber, protein, vitamins and minerals
+• 🏭 processing level (NOVA 1–4) and E-additives
+• 🧪 ingredient quality (sweeteners, colorings, oils)
+
+🟢 80–100 excellent · 🟡 60–79 good · 🟠 40–59 moderate · 🔴 0–39 avoid
+
+<b>Goal Fit 0–100</b> — how well it matches <i>your goal</i>:
+• Weight loss — fewer calories and sugar, more fiber and protein
+• Muscle gain / high protein — protein per calorie
+• Keto / low carb — net carbs and sugar
+• Heart health — saturated fat, sodium, fiber
+• Diabetes friendly — sugar, net carbs, fiber
+• Mediterranean, high fiber, whole food, low sodium, plant based — each by its own criteria
 
 ⚠️ Estimates are approximate and not medical advice.`,
     analyzing: "🔍 Analyzing…",
     error: "😕 Couldn't analyze that. Please try again — good lighting and a close-up help.",
     dish: "Dish",
     portion: "Portion",
+    goalLine: "Goal",
     good: "<b>✅ What's good</b>",
     know: "<b>ℹ️ Things to know</b>",
     kcal: "kcal", p: "P", c: "C", f: "F",
@@ -183,16 +277,35 @@ Deno.serve(async (req) => {
 
   const ok = () => new Response(JSON.stringify({ ok: true }), { headers: { "Content-Type": "application/json" } });
 
-  // language selection button
+  // inline keyboard buttons
   const cq = update.callback_query;
-  if (cq?.data?.startsWith("lang:")) {
-    const lang = (cq.data.split(":")[1] === "en" ? "en" : "ru") as Lang;
+  if (cq?.data) {
     const cid = cq.message?.chat?.id;
     await answerCallback(cq.id);
-    if (cid) {
-      await setLang(cid, lang);
+    if (!cid) return ok();
+
+    if (cq.data.startsWith("lang:")) {
+      const lang = (cq.data.split(":")[1] === "en" ? "en" : "ru") as Lang;
+      await saveSettings(cid, { lang });
+      const s = await getSettings(cid);
       await sendMessage(cid, T[lang].saved);
+      if (!s?.goal) {
+        await sendMessage(cid, T[lang].chooseGoal, goalKeyboard(lang));
+      } else {
+        await sendMessage(cid, T[lang].help);
+      }
+      return ok();
+    }
+
+    if (cq.data.startsWith("goal:")) {
+      const id = cq.data.split(":")[1] as NutritionGoal;
+      const goal = GOALS.some((g) => g.id === id) ? id : "balanced";
+      const s = await getSettings(cid);
+      const lang = s?.lang ?? "ru";
+      await saveSettings(cid, { goal });
+      await sendMessage(cid, T[lang].goalSaved(goalLabel(goal, lang)));
       await sendMessage(cid, T[lang].help);
+      return ok();
     }
     return ok();
   }
@@ -201,26 +314,40 @@ Deno.serve(async (req) => {
   const chatId = msg?.chat?.id;
   if (!chatId) return ok();
 
-  let lang = await getLang(chatId);
+  const settings = await getSettings(chatId);
+  let lang: Lang | null = settings?.lang ?? null;
 
   try {
     const photos = msg.photo as Array<{ file_id: string }> | undefined;
     const text: string | undefined = msg.text ?? msg.caption;
 
-    // explicit language command
+    // explicit commands
     if (text && (text.startsWith("/language") || text.startsWith("/lang"))) {
       await sendMessage(chatId, T[lang ?? "ru"].choose, LANG_KEYBOARD);
       return ok();
     }
+    if (text && text.startsWith("/goal")) {
+      await sendMessage(chatId, T[lang ?? "ru"].chooseGoal, goalKeyboard(lang ?? "ru"));
+      return ok();
+    }
+    if (text && text.startsWith("/criteria")) {
+      await sendMessage(chatId, T[lang ?? "ru"].criteria);
+      return ok();
+    }
 
-    // first contact — ask for language
+    // onboarding — step 1: language
     if (!lang) {
       await sendMessage(chatId, T.ru.choose, LANG_KEYBOARD);
-      if (!photos?.length) return ok();
-      lang = "ru";
+      return ok();
+    }
+    // onboarding — step 2: goal
+    if (!settings?.goal) {
+      await sendMessage(chatId, T[lang].chooseGoal, goalKeyboard(lang));
+      return ok();
     }
 
     const t = T[lang];
+
 
     if (!photos?.length) {
       if (!text || text.startsWith("/start") || text.startsWith("/help")) {
@@ -267,7 +394,7 @@ Deno.serve(async (req) => {
       additives: parsed.additives || [],
     };
 
-    const goal: NutritionGoal = "balanced";
+    const goal: NutritionGoal = settings.goal;
     const { universal, goalFit, insights } = await analyzeProduct(product, goal, lang);
     const n = product.nutrition;
 
@@ -276,7 +403,7 @@ Deno.serve(async (req) => {
       parsed.portion_estimate ? `${t.portion}: ${esc(parsed.portion_estimate)}` : "",
       "",
       `<b>Health Score:</b> ${universal.score}/100 (${esc(universal.category_label)})`,
-      `<b>Goal Fit:</b> ${goalFit}/100`,
+      `<b>Goal Fit:</b> ${goalFit}/100 — ${esc(goalLabel(goal, lang))}`,
       "",
       `🔥 ${Math.round(n.calories ?? 0)} ${t.kcal}  •  ${t.p} ${Math.round(n.protein_g ?? 0)}g  •  ${t.c} ${Math.round(n.carbs_g ?? 0)}g  •  ${t.f} ${Math.round(n.fat_g ?? 0)}g`,
     ];
