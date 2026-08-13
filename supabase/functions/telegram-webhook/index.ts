@@ -3,17 +3,14 @@ import { analyzeProduct } from "../_shared/analyzePipeline.ts";
 import type { NormalizedProduct } from "../_shared/foodAdapters.ts";
 import type { NutritionGoal } from "../_shared/goalFit.ts";
 
-const GATEWAY = "https://connector-gateway.lovable.dev/telegram";
 const AI = "https://api.openai.com/v1/chat/completions";
 
-const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
-const TELEGRAM_API_KEY = Deno.env.get("TELEGRAM_API_KEY");
+const TELEGRAM_BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN");
+const BOT_API = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;
 
 function tgHeaders() {
   return {
-    Authorization: `Bearer ${LOVABLE_API_KEY}`,
-    "X-Connection-Api-Key": TELEGRAM_API_KEY!,
     "Content-Type": "application/json",
   };
 }
@@ -32,7 +29,7 @@ function safeEqual(a: string | null, b: string): boolean {
 }
 
 async function sendMessage(chatId: number, text: string, replyMarkup?: unknown) {
-  const r = await fetch(`${GATEWAY}/sendMessage`, {
+  const r = await fetch(`${BOT_API}/sendMessage`, {
     method: "POST",
     headers: tgHeaders(),
     body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML", reply_markup: replyMarkup }),
@@ -41,7 +38,7 @@ async function sendMessage(chatId: number, text: string, replyMarkup?: unknown) 
 }
 
 async function answerCallback(id: string) {
-  await fetch(`${GATEWAY}/answerCallbackQuery`, {
+  await fetch(`${BOT_API}/answerCallbackQuery`, {
     method: "POST", headers: tgHeaders(), body: JSON.stringify({ callback_query_id: id }),
   });
 }
@@ -211,7 +208,7 @@ It drives your <b>Goal Fit</b> — how well a food matches you personally.`,
 } as const;
 
 async function downloadPhoto(fileId: string): Promise<{ base64: string; mimeType: string }> {
-  const fr = await fetch(`${GATEWAY}/getFile`, {
+  const fr = await fetch(`${BOT_API}/getFile`, {
     method: "POST", headers: tgHeaders(), body: JSON.stringify({ file_id: fileId }),
   });
   if (!fr.ok) throw new Error(`getFile failed [${fr.status}]: ${await fr.text()}`);
@@ -219,9 +216,7 @@ async function downloadPhoto(fileId: string): Promise<{ base64: string; mimeType
   const path = fd?.result?.file_path;
   if (!path) throw new Error(`getFile: no file_path (${JSON.stringify(fd)})`);
 
-  const dr = await fetch(`${GATEWAY}/file/${path}`, {
-    headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "X-Connection-Api-Key": TELEGRAM_API_KEY! },
-  });
+  const dr = await fetch(`https://api.telegram.org/file/bot${TELEGRAM_BOT_TOKEN}/${path}`);
   if (!dr.ok) throw new Error(`download failed [${dr.status}]`);
   const buf = new Uint8Array(await dr.arrayBuffer());
   let bin = "";
@@ -267,9 +262,9 @@ function scoreEmoji(s: number) {
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") return new Response("Method not allowed", { status: 405 });
-  if (!LOVABLE_API_KEY || !OPENAI_API_KEY || !TELEGRAM_API_KEY) return new Response("Not configured", { status: 500 });
+  if (!OPENAI_API_KEY || !TELEGRAM_BOT_TOKEN) return new Response("Not configured", { status: 500 });
 
-  const expected = await deriveSecret(TELEGRAM_API_KEY);
+  const expected = await deriveSecret(TELEGRAM_BOT_TOKEN);
   if (!safeEqual(req.headers.get("X-Telegram-Bot-Api-Secret-Token"), expected)) {
     return new Response("Unauthorized", { status: 401 });
   }
