@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { Mail, Lock, Eye, EyeOff, ArrowRight, Globe } from "lucide-react";
@@ -46,16 +46,36 @@ const Auth = () => {
     }
   };
 
-  const handleGoogleSignIn = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: window.location.origin,
-      },
-    });
-    if (error) {
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const handoff = params.get("oauth_handoff");
+    const oauthError = params.get("oauth_error");
+
+    if (oauthError) {
       toast.error(language === "ru" ? "Ошибка входа через Google" : "Failed to sign in with Google");
+      navigate("/auth", { replace: true });
+      return;
     }
+    if (!handoff) return;
+
+    setLoading(true);
+    fetch(`/account/auth/session?handoff=${encodeURIComponent(handoff)}`, { credentials: "same-origin" })
+      .then(async (response) => {
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || "OAuth session expired");
+        const { error } = await supabase.auth.setSession(payload);
+        if (error) throw error;
+        navigate("/", { replace: true });
+      })
+      .catch((error) => {
+        toast.error(error instanceof Error ? error.message : "Failed to sign in with Google");
+        navigate("/auth", { replace: true });
+      })
+      .finally(() => setLoading(false));
+  }, [language, navigate]);
+
+  const handleGoogleSignIn = () => {
+    window.location.assign("/account/login/start");
   };
 
   return (
