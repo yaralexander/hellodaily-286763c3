@@ -15,6 +15,7 @@ import Scan from "./pages/Scan.tsx";
 import ScanResult from "./pages/ScanResult.tsx";
 import ScanHistory from "./pages/ScanHistory.tsx";
 import NotFound from "./pages/NotFound.tsx";
+import LegalPage from "./pages/LegalPage.tsx";
 import { useAuth } from "./hooks/useAuth";
 
 const queryClient = new QueryClient();
@@ -74,6 +75,8 @@ const App = () => (
               <Route path="/scan/result/:id" element={<ProtectedRoute><ScanResult /></ProtectedRoute>} />
               <Route path="/scan/history" element={<ProtectedRoute><ScanHistory /></ProtectedRoute>} />
               <Route path="/auth" element={<AuthRoute><Auth /></AuthRoute>} />
+              <Route path="/privacy" element={<LegalPage />} />
+              <Route path="/terms" element={<LegalPage />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

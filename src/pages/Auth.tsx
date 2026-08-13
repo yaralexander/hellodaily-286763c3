@@ -7,7 +7,7 @@ import logoLight from "@/assets/logo-light.gif";
 import logoDark from "@/assets/logo-dark.gif";
 import bgLight from "@/assets/bg-light.jpg";
 import bgDark from "@/assets/bg-dark.jpg";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useLanguage, Language } from "@/contexts/LanguageContext";
 
@@ -198,6 +198,10 @@ const Auth = () => {
             {isLogin ? t.signUp : t.signIn}
           </button>
         </p>
+        <div className="flex justify-center gap-4 mt-4 text-[11px] text-muted-foreground">
+          <Link to="/privacy" className="hover:text-primary hover:underline">{language === "ru" ? "Конфиденциальность" : "Privacy"}</Link>
+          <Link to="/terms" className="hover:text-primary hover:underline">{language === "ru" ? "Условия" : "Terms"}</Link>
+        </div>
       </motion.div>
     </div>
   );
