@@ -6,6 +6,7 @@ import { ArrowLeft, ScanLine, Trophy, AlertTriangle, Target } from "lucide-react
 import { format } from "date-fns";
 import BottomNav from "@/components/BottomNav";
 import { useNutritionGoal, goalLabel } from "@/hooks/useNutritionGoal";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 type Tab = "all" | "best" | "for_goal" | "avoid";
 
@@ -15,6 +16,8 @@ const SCORE_COLOR = (s: number) =>
 const ScanHistory = () => {
   const navigate = useNavigate();
   const { goal } = useNutritionGoal();
+  const { language } = useLanguage();
+  const ru = language === "ru";
   const [tab, setTab] = useState<Tab>("all");
 
   const { data: scans = [] } = useQuery({
@@ -44,17 +47,17 @@ const ScanHistory = () => {
   });
 
   const tabs: { v: Tab; label: string; icon: any }[] = [
-    { v: "all", label: "All", icon: ScanLine },
-    { v: "best", label: "Smart Buy", icon: Trophy },
-    { v: "for_goal", label: `For Goal`, icon: Target },
-    { v: "avoid", label: "Avoid", icon: AlertTriangle },
+    { v: "all", label: ru ? "Все" : "All", icon: ScanLine },
+    { v: "best", label: ru ? "Лучший выбор" : "Smart Buy", icon: Trophy },
+    { v: "for_goal", label: ru ? "Для цели" : "For Goal", icon: Target },
+    { v: "avoid", label: ru ? "Избегать" : "Avoid", icon: AlertTriangle },
   ];
 
   const emptyCopy: Record<Tab, string> = {
-    all: "No scans yet. Try scanning your first food!",
-    best: "No top-quality scans yet. Scan more products to build your Smart Buy list.",
-    for_goal: `Nothing scanned that fits ${goalLabel(goal)} yet.`,
-    avoid: "No low-quality scans recorded — nice work!",
+    all: ru ? "Сканирований пока нет. Попробуйте отсканировать первый продукт!" : "No scans yet. Try scanning your first food!",
+    best: ru ? "Лучших вариантов пока нет. Сканируйте больше продуктов, чтобы составить список." : "No top-quality scans yet. Scan more products to build your Smart Buy list.",
+    for_goal: ru ? `Пока нет продуктов для цели «${goalLabel(goal, language)}».` : `Nothing scanned that fits ${goalLabel(goal, language)} yet.`,
+    avoid: ru ? "Продуктов с низкой оценкой нет — отличная работа!" : "No low-quality scans recorded — nice work!",
   };
 
   return (
@@ -64,18 +67,18 @@ const ScanHistory = () => {
           <button onClick={() => navigate("/scan")} className="w-9 h-9 rounded-xl bg-secondary flex items-center justify-center">
             <ArrowLeft className="w-4 h-4" />
           </button>
-          <h1 className="text-lg font-bold">Food Archive</h1>
+          <h1 className="text-lg font-bold">{ru ? "Архив продуктов" : "Food Archive"}</h1>
           <div className="w-9 h-9" />
         </div>
 
         <div className="glass-card p-4 mb-4 flex items-center justify-between">
           <div>
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Wellness Points</p>
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">{ru ? "Баллы здоровья" : "Wellness Points"}</p>
             <p className="text-2xl font-extrabold text-foreground">{pointsTotal}</p>
           </div>
           <div className="text-right">
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Current Goal</p>
-            <p className="text-sm font-bold text-foreground">{goalLabel(goal)}</p>
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">{ru ? "Текущая цель" : "Current Goal"}</p>
+            <p className="text-sm font-bold text-foreground">{goalLabel(goal, language)}</p>
           </div>
         </div>
 
@@ -125,7 +128,7 @@ const ScanHistory = () => {
                   </div>
                   <div className="text-right">
                     <div className={`text-lg font-extrabold ${SCORE_COLOR(primary)}`}>{primary}</div>
-                    <div className="text-[9px] text-muted-foreground">fit {secondary}</div>
+                    <div className="text-[9px] text-muted-foreground">{ru ? "соответствие" : "fit"} {secondary}</div>
                   </div>
                 </button>
               );

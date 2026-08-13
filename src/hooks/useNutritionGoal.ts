@@ -23,8 +23,17 @@ export const GOAL_OPTIONS: { value: NutritionGoal; label: string; emoji: string 
   { value: "plant_based", label: "Plant Based", emoji: "🌱" },
 ];
 
-export const goalLabel = (g: string | null | undefined) =>
-  GOAL_OPTIONS.find((o) => o.value === g)?.label || "Balanced Nutrition";
+const GOAL_LABELS_RU: Record<NutritionGoal, string> = {
+  balanced: "Сбалансированное питание", weight_loss: "Снижение веса", muscle_gain: "Набор мышц",
+  high_protein: "Больше белка", keto: "Кето-диета", low_carb: "Меньше углеводов",
+  heart_health: "Здоровье сердца", diabetes_friendly: "При диабете", mediterranean: "Средиземноморская диета",
+  high_fiber: "Больше клетчатки", whole_food: "Цельные продукты", low_sodium: "Меньше соли", plant_based: "Растительное питание",
+};
+
+export const goalLabel = (g: string | null | undefined, language: "en" | "ru" = "en") => {
+  const goal = (GOAL_OPTIONS.find((o) => o.value === g)?.value || "balanced") as NutritionGoal;
+  return language === "ru" ? GOAL_LABELS_RU[goal] : GOAL_OPTIONS.find((o) => o.value === goal)!.label;
+};
 
 export function useNutritionGoal() {
   const qc = useQueryClient();

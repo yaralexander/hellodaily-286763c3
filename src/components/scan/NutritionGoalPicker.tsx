@@ -2,9 +2,12 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Target, Check, ChevronDown } from "lucide-react";
 import { useNutritionGoal, GOAL_OPTIONS, goalLabel } from "@/hooks/useNutritionGoal";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const NutritionGoalPicker = ({ compact = false }: { compact?: boolean }) => {
   const { goal, setGoal, isUpdating } = useNutritionGoal();
+  const { language } = useLanguage();
+  const ru = language === "ru";
   const [open, setOpen] = useState(false);
   const current = GOAL_OPTIONS.find((o) => o.value === goal);
 
@@ -15,9 +18,9 @@ const NutritionGoalPicker = ({ compact = false }: { compact?: boolean }) => {
           <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center text-xl">{current?.emoji}</div>
           <div>
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold flex items-center gap-1">
-              <Target className="w-3 h-3" /> My Nutrition Goal
+              <Target className="w-3 h-3" /> {ru ? "Моя цель питания" : "My Nutrition Goal"}
             </p>
-            <p className="text-sm font-bold text-foreground">{goalLabel(goal)}</p>
+            <p className="text-sm font-bold text-foreground">{goalLabel(goal, language)}</p>
           </div>
         </div>
         <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
@@ -44,7 +47,7 @@ const NutritionGoalPicker = ({ compact = false }: { compact?: boolean }) => {
                     }`}
                   >
                     <span className="text-base">{o.emoji}</span>
-                    <span className="flex-1">{o.label}</span>
+                    <span className="flex-1">{goalLabel(o.value, language)}</span>
                     {active && <Check className="w-3.5 h-3.5" />}
                   </button>
                 );
@@ -52,7 +55,7 @@ const NutritionGoalPicker = ({ compact = false }: { compact?: boolean }) => {
             </div>
             {!compact && (
               <p className="text-[10px] text-muted-foreground mt-3 leading-relaxed">
-                Changing your goal recalculates Goal Fit Scores for every product you've scanned.
+                {ru ? "При изменении цели оценки всех отсканированных продуктов будут пересчитаны." : "Changing your goal recalculates Goal Fit Scores for every product you've scanned."}
               </p>
             )}
           </motion.div>

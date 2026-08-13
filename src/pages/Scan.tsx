@@ -11,11 +11,14 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 type PhotoTarget = "package" | "meal" | null;
 
 const Scan = () => {
   const navigate = useNavigate();
+  const { language } = useLanguage();
+  const ru = language === "ru";
   const { barcode, pkg, meal, text } = useFoodScan();
   const [scanning, setScanning] = useState(false);
   const [photoTarget, setPhotoTarget] = useState<PhotoTarget>(null);
@@ -24,10 +27,10 @@ const Scan = () => {
   const [recording, setRecording] = useState(false);
   const recorderRef = useRef<any>(null);
   const busy = barcode.isPending || pkg.isPending || meal.isPending || text.isPending;
-  const busyLabel = barcode.isPending ? "Looking up product…"
-    : pkg.isPending ? "Reading the package…"
-    : meal.isPending ? "Analyzing your meal…"
-    : text.isPending ? "Analyzing your description…" : "";
+  const busyLabel = barcode.isPending ? (ru ? "Ищем продукт…" : "Looking up product…")
+    : pkg.isPending ? (ru ? "Читаем упаковку…" : "Reading the package…")
+    : meal.isPending ? (ru ? "Анализируем блюдо…" : "Analyzing your meal…")
+    : text.isPending ? (ru ? "Анализируем описание…" : "Analyzing your description…") : "";
 
   const handlePackage = async (file: File) => {
     const { base64, mimeType } = await fileToBase64(file);
@@ -51,13 +54,13 @@ const Scan = () => {
   const startVoice = () => {
     const SR: any = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SR) {
-      toast.message("Voice not supported here — try text input.");
+      toast.message(ru ? "Голосовой ввод не поддерживается — используйте текст." : "Voice not supported here — try text input.");
       setTextOpen(true);
       return;
     }
     try {
       const rec = new SR();
-      rec.lang = "en-US";
+      rec.lang = ru ? "ru-RU" : "en-US";
       rec.interimResults = false;
       rec.maxAlternatives = 1;
       rec.onresult = (ev: any) => {
@@ -66,17 +69,17 @@ const Scan = () => {
         if (transcript) {
           text.mutate(transcript);
         } else {
-          toast.error("Didn't catch that — try again.");
+          toast.error(ru ? "Не удалось распознать — попробуйте ещё раз." : "Didn't catch that — try again.");
         }
       };
-      rec.onerror = () => { setRecording(false); toast.error("Voice error — try text input."); };
+      rec.onerror = () => { setRecording(false); toast.error(ru ? "Ошибка голосового ввода — используйте текст." : "Voice error — try text input."); };
       rec.onend = () => setRecording(false);
       (recorderRef as any).current = rec;
       rec.start();
       setRecording(true);
-      toast.info("Listening… say what you ate.");
+      toast.info(ru ? "Слушаю… расскажите, что вы съели." : "Listening… say what you ate.");
     } catch {
-      toast.error("Microphone access denied");
+      toast.error(ru ? "Доступ к микрофону запрещён" : "Microphone access denied");
     }
   };
   const stopVoice = () => {
@@ -101,7 +104,7 @@ const Scan = () => {
     </motion.button>
   );
 
-  const targetTitle = photoTarget === "package" ? "Scan Package" : photoTarget === "meal" ? "Scan Meal" : "";
+  const targetTitle = photoTarget === "package" ? (ru ? "Сканировать упаковку" : "Scan Package") : photoTarget === "meal" ? (ru ? "Сканировать блюдо" : "Scan Meal") : "";
   const targetHandler = photoTarget === "package" ? handlePackage : photoTarget === "meal" ? handleMeal : () => {};
 
   return (
@@ -117,7 +120,7 @@ const Scan = () => {
         <SheetContent side="bottom" className="glass-card border-t border-white/10 rounded-t-3xl pb-8">
           <SheetHeader className="text-center mb-6">
             <SheetTitle className="text-lg font-bold">{targetTitle}</SheetTitle>
-            <SheetDescription className="text-xs text-muted-foreground">Choose how you want to add the photo</SheetDescription>
+            <SheetDescription className="text-xs text-muted-foreground">{ru ? "Выберите способ добавления фотографии" : "Choose how you want to add the photo"}</SheetDescription>
           </SheetHeader>
           <div className="flex gap-4 justify-center">
             <CameraInput capture="environment" onSelected={targetHandler}>
@@ -125,7 +128,7 @@ const Scan = () => {
                 <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center text-primary">
                   <Camera className="w-5 h-5" />
                 </div>
-                <span className="text-xs font-medium text-foreground">Take Photo</span>
+                <span className="text-xs font-medium text-foreground">{ru ? "Сфотографировать" : "Take Photo"}</span>
               </button>
             </CameraInput>
             <CameraInput onSelected={targetHandler}>
@@ -133,7 +136,7 @@ const Scan = () => {
                 <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center text-primary">
                   <ImagePlus className="w-5 h-5" />
                 </div>
-                <span className="text-xs font-medium text-foreground">Gallery</span>
+                <span className="text-xs font-medium text-foreground">{ru ? "Галерея" : "Gallery"}</span>
               </button>
             </CameraInput>
           </div>
@@ -143,16 +146,16 @@ const Scan = () => {
       <Dialog open={textOpen} onOpenChange={setTextOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Describe your food</DialogTitle>
+            <DialogTitle>{ru ? "Опишите еду" : "Describe your food"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-2 py-2">
             <p className="text-xs text-muted-foreground">
-              Tell the AI what you ate — dish name, ingredients, and portion size. Example: "grilled chicken breast, 200g, with 100g of rice and a small salad".
+              {ru ? "Расскажите AI, что вы съели: название блюда, ингредиенты и размер порции. Например: «куриная грудка на гриле, 200 г, с 100 г риса и небольшим салатом»." : "Tell the AI what you ate — dish name, ingredients, and portion size. Example: \"grilled chicken breast, 200g, with 100g of rice and a small salad\"."}
             </p>
             <Textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="What did you eat?"
+              placeholder={ru ? "Что вы съели?" : "What did you eat?"}
               rows={4}
               autoFocus
             />
@@ -162,14 +165,14 @@ const Scan = () => {
               onClick={() => setTextOpen(false)}
               className="glass-card p-3 flex items-center justify-center gap-2 text-sm font-bold text-white bg-gradient-to-r from-rose-500 to-red-600"
             >
-              Cancel
+              {ru ? "Отмена" : "Cancel"}
             </button>
             <button
               onClick={submitText}
               disabled={!description.trim() || text.isPending}
               className="glass-card p-3 flex items-center justify-center gap-2 text-sm font-bold text-white bg-gradient-to-r from-emerald-500 to-green-600 disabled:opacity-60"
             >
-              {text.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Analyze
+              {text.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : null} {ru ? "Анализировать" : "Analyze"}
             </button>
           </DialogFooter>
         </DialogContent>
@@ -180,7 +183,7 @@ const Scan = () => {
           <button onClick={() => navigate(-1)} className="w-9 h-9 rounded-xl bg-secondary flex items-center justify-center">
             <ArrowLeft className="w-4 h-4" />
           </button>
-          <h1 className="text-lg font-bold">Scan Food</h1>
+          <h1 className="text-lg font-bold">{ru ? "Сканировать еду" : "Scan Food"}</h1>
           <button onClick={() => navigate("/scan/history")} className="w-9 h-9 rounded-xl bg-secondary flex items-center justify-center">
             <History className="w-4 h-4" />
           </button>
@@ -188,8 +191,8 @@ const Scan = () => {
 
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="glass-card p-5 mb-3 text-center">
           <p className="text-[10px] uppercase tracking-[0.2em] text-primary/70 font-bold">Before You Eat AI™</p>
-          <h2 className="text-xl font-extrabold text-foreground mt-1">Is it right for your goal?</h2>
-          <p className="text-xs text-muted-foreground mt-2">Know in 5 seconds — every food is scored as a fit for your nutrition goal.</p>
+          <h2 className="text-xl font-extrabold text-foreground mt-1">{ru ? "Подходит ли это для вашей цели?" : "Is it right for your goal?"}</h2>
+          <p className="text-xs text-muted-foreground mt-2">{ru ? "Узнайте за 5 секунд — каждый продукт получает оценку соответствия вашей цели питания." : "Know in 5 seconds — every food is scored as a fit for your nutrition goal."}</p>
         </motion.div>
 
         <div className="mb-5">
@@ -206,7 +209,7 @@ const Scan = () => {
         <div className="space-y-3">
           <Tile
             icon={Barcode}
-            title="Scan Barcode"
+            title={ru ? "Сканировать штрихкод" : "Scan Barcode"}
             subtitle="EAN / UPC · Open Food Facts + Fineli"
             accent="linear-gradient(135deg, hsl(217 91% 55%), hsl(262 60% 55%))"
             onClick={() => setScanning(true)}
@@ -214,32 +217,32 @@ const Scan = () => {
           />
           <Tile
             icon={Package}
-            title="Scan Package"
-            subtitle="Take a photo or pick from gallery"
+            title={ru ? "Сканировать упаковку" : "Scan Package"}
+            subtitle={ru ? "Сфотографируйте или выберите из галереи" : "Take a photo or pick from gallery"}
             accent="linear-gradient(135deg, hsl(280 70% 55%), hsl(0 85% 55%))"
             onClick={() => setPhotoTarget("package")}
             disabled={busy}
           />
           <Tile
             icon={Utensils}
-            title="Scan Meal"
-            subtitle="Take a photo or pick from gallery"
+            title={ru ? "Сканировать блюдо" : "Scan Meal"}
+            subtitle={ru ? "Сфотографируйте или выберите из галереи" : "Take a photo or pick from gallery"}
             accent="linear-gradient(135deg, hsl(32 95% 50%), hsl(142 70% 42%))"
             onClick={() => setPhotoTarget("meal")}
             disabled={busy}
           />
           <Tile
             icon={Type}
-            title="Text Input"
-            subtitle="Describe your meal — AI estimates it"
+            title={ru ? "Текстовый ввод" : "Text Input"}
+            subtitle={ru ? "Опишите блюдо — AI оценит его" : "Describe your meal — AI estimates it"}
             accent="linear-gradient(135deg, hsl(200 80% 50%), hsl(170 70% 45%))"
             onClick={() => setTextOpen(true)}
             disabled={busy}
           />
           <Tile
             icon={recording ? Square : Mic}
-            title={recording ? "Stop Recording" : "Voice Input"}
-            subtitle={recording ? "Tap to finish and transcribe" : "Say what you ate — hands-free"}
+            title={recording ? (ru ? "Остановить запись" : "Stop Recording") : (ru ? "Голосовой ввод" : "Voice Input")}
+            subtitle={recording ? (ru ? "Нажмите, чтобы завершить и распознать" : "Tap to finish and transcribe") : (ru ? "Расскажите, что вы съели" : "Say what you ate — hands-free")}
             accent="linear-gradient(135deg, hsl(340 80% 55%), hsl(15 85% 55%))"
             onClick={recording ? stopVoice : startVoice}
             disabled={busy && !recording}
@@ -247,7 +250,7 @@ const Scan = () => {
         </div>
 
         <p className="text-[10px] text-muted-foreground text-center mt-6 px-6">
-          Informational only — not medical advice. Results are AI-generated estimates.
+          {ru ? "Только для информации — не является медицинской рекомендацией. Результаты являются оценкой AI." : "Informational only — not medical advice. Results are AI-generated estimates."}
         </p>
       </div>
       <BottomNav />

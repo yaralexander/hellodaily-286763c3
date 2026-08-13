@@ -94,7 +94,8 @@ const emptyForm: ManualForm = { food_name: "", meal_type: "snack", calories: "",
 const Nutrition = () => {
   const { session } = useAuth();
   const queryClient = useQueryClient();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const ru = language === "ru";
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
@@ -168,7 +169,7 @@ const Nutrition = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["profile-calorie-settings"] });
       setShowCalorieSettings(false);
-      toast.success("Calorie limit updated");
+      toast.success(ru ? "Лимит калорий обновлён" : "Calorie limit updated");
     },
     onError: (err: any) => toast.error(err.message || "Failed to save"),
   });
@@ -251,7 +252,7 @@ const Nutrition = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["food-logs"] });
-      toast.success("Entry removed");
+      toast.success(ru ? "Запись удалена" : "Entry removed");
     },
   });
 
@@ -281,9 +282,9 @@ const Nutrition = () => {
       queryClient.invalidateQueries({ queryKey: ["food-logs"] });
       setAnalysisResult(null);
       setPreview(null);
-      toast.success("Meal logged!");
+      toast.success(ru ? "Приём пищи записан!" : "Meal logged!");
     },
-    onError: () => toast.error("Failed to save"),
+    onError: () => toast.error(ru ? "Не удалось сохранить" : "Failed to save"),
   });
 
   const saveManualMutation = useMutation({
@@ -322,7 +323,7 @@ const Nutrition = () => {
       setForm(emptyForm);
       toast.success(editingId ? "Entry updated!" : "Meal logged!");
     },
-    onError: () => toast.error("Failed to save"),
+    onError: () => toast.error(ru ? "Не удалось сохранить" : "Failed to save"),
   });
 
   const startEdit = (log: FoodLog) => {
@@ -390,10 +391,10 @@ const Nutrition = () => {
           carbs_g: String(Math.round(data.carbs_g * 10) / 10),
           fat_g: String(Math.round(data.fat_g * 10) / 10),
         }));
-        toast.success("Nutrition recalculated!");
+        toast.success(ru ? "Пищевая ценность пересчитана!" : "Nutrition recalculated!");
       }
     } catch {
-      toast.error("Could not recalculate nutrition");
+      toast.error(ru ? "Не удалось пересчитать пищевую ценность" : "Could not recalculate nutrition");
     } finally {
       setRecalcEditForm(false);
     }
@@ -430,7 +431,7 @@ const Nutrition = () => {
         }
       }
     } catch {
-      toast.error("Could not recalculate nutrition");
+      toast.error(ru ? "Не удалось пересчитать пищевую ценность" : "Could not recalculate nutrition");
     } finally {
       setRecalculating(null);
       setEditingAiIndex(null);
@@ -485,7 +486,7 @@ const Nutrition = () => {
             >
               <AlertTriangle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm font-semibold text-destructive">Daily calorie limit exceeded</p>
+                <p className="text-sm font-semibold text-destructive">{t.dailyLimitExceeded}</p>
                 <p className="text-xs text-destructive/80 mt-0.5">
                   You've exceeded your limit by {exceededBy} kcal. Consider lighter meals for the rest of the day.
                 </p>
@@ -505,7 +506,7 @@ const Nutrition = () => {
             >
               <AlertTriangle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm font-semibold text-yellow-700 dark:text-yellow-400">Approaching calorie limit</p>
+                <p className="text-sm font-semibold text-yellow-700 dark:text-yellow-400">{t.approachingLimit}</p>
                 <p className="text-xs text-yellow-600/80 dark:text-yellow-400/70 mt-0.5">
                   Only {remaining} kcal remaining for today.
                 </p>
@@ -590,8 +591,8 @@ const Nutrition = () => {
                 <div className="flex items-center gap-3 p-4 rounded-xl bg-secondary/50">
                   <Loader2 className="w-5 h-5 text-primary animate-spin" />
                   <div>
-                    <p className="text-sm font-medium text-foreground">Analyzing your meal...</p>
-                    <p className="text-xs text-muted-foreground">Detecting food items & nutrients</p>
+                    <p className="text-sm font-medium text-foreground">{ru ? "Анализируем блюдо..." : "Analyzing your meal..."}</p>
+                    <p className="text-xs text-muted-foreground">{ru ? "Определяем продукты и пищевую ценность" : "Detecting food items & nutrients"}</p>
                   </div>
                 </div>
               )}
@@ -607,7 +608,7 @@ const Nutrition = () => {
                               value={food.name}
                               onChange={(e) => updateAiFood(i, "name", e.target.value)}
                               className="flex-1 h-8 rounded-lg bg-background border border-border/50 px-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                              placeholder="Food name"
+                              placeholder={t.foodName}
                             />
                             <button
                               onClick={() => recalcAiFood(i, food.name)}
@@ -639,7 +640,7 @@ const Nutrition = () => {
                             <input
                               value={food.portion_size}
                               onChange={(e) => updateAiFood(i, "portion_size", e.target.value)}
-                              placeholder="Portion"
+                              placeholder={ru ? "Порция" : "Portion"}
                               className="flex-1 h-7 rounded-lg bg-background border border-border/50 px-2 text-xs text-foreground focus:outline-none"
                             />
                             <button
@@ -649,7 +650,7 @@ const Nutrition = () => {
                             >
                               {recalculating === i ? <Loader2 className="w-3 h-3 animate-spin" /> : "Recalc"}
                             </button>
-                            <button onClick={() => setEditingAiIndex(null)} className="px-3 h-7 rounded-lg bg-secondary text-xs text-muted-foreground">Done</button>
+                            <button onClick={() => setEditingAiIndex(null)} className="px-3 h-7 rounded-lg bg-secondary text-xs text-muted-foreground">{ru ? "Готово" : "Done"}</button>
                           </div>
                         </div>
                       ) : (
@@ -673,7 +674,7 @@ const Nutrition = () => {
                     <button onClick={() => saveMutation.mutate(analysisResult)} disabled={saveMutation.isPending} className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50">
                       {saveMutation.isPending ? "Saving..." : "Log This Meal"}
                     </button>
-                    <button onClick={() => fileInputRef.current?.click()} className="py-2.5 px-4 rounded-xl bg-secondary text-secondary-foreground text-sm font-medium">Retry</button>
+                    <button onClick={() => fileInputRef.current?.click()} className="py-2.5 px-4 rounded-xl bg-secondary text-secondary-foreground text-sm font-medium">{ru ? "Повторить" : "Retry"}</button>
                   </div>
                 </div>
               )}
@@ -692,9 +693,9 @@ const Nutrition = () => {
                 </div>
 
                 <div>
-                  <label className="text-[10px] text-muted-foreground uppercase tracking-wider">Food Name</label>
+                  <label className="text-[10px] text-muted-foreground uppercase tracking-wider">{t.foodName}</label>
                   <div className="flex gap-2 mt-1">
-                    <input value={form.food_name} onChange={(e) => updateField("food_name", e.target.value)} placeholder="e.g. Grilled Chicken Salad" className="flex-1 h-10 rounded-xl bg-secondary border border-border/50 px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50" />
+                    <input value={form.food_name} onChange={(e) => updateField("food_name", e.target.value)} placeholder={ru ? "например, салат с курицей" : "e.g. Grilled Chicken Salad"} className="flex-1 h-10 rounded-xl bg-secondary border border-border/50 px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50" />
                     <button
                       onClick={recalcEditFormFood}
                       disabled={recalcEditForm || !form.food_name.trim()}
@@ -707,7 +708,7 @@ const Nutrition = () => {
                 </div>
 
                 <div>
-                  <label className="text-[10px] text-muted-foreground uppercase tracking-wider">Meal Type</label>
+                  <label className="text-[10px] text-muted-foreground uppercase tracking-wider">{t.mealType}</label>
                   <div className="flex gap-2 mt-1">
                     {MEAL_TYPES.map((mt) => (
                       <button key={mt} onClick={() => updateField("meal_type", mt)} className={`px-3 py-1.5 rounded-full text-xs font-medium capitalize ${form.meal_type === mt ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>
@@ -718,8 +719,8 @@ const Nutrition = () => {
                 </div>
 
                 <div>
-                  <label className="text-[10px] text-muted-foreground uppercase tracking-wider">Portion Size</label>
-                  <input value={form.portion_size} onChange={(e) => updateField("portion_size", e.target.value)} placeholder="e.g. 1 bowl, 200g" className="w-full mt-1 h-10 rounded-xl bg-secondary border border-border/50 px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50" />
+                  <label className="text-[10px] text-muted-foreground uppercase tracking-wider">{t.portionSize}</label>
+                  <input value={form.portion_size} onChange={(e) => updateField("portion_size", e.target.value)} placeholder={ru ? "например, 1 порция, 200 г" : "e.g. 1 bowl, 200g"} className="w-full mt-1 h-10 rounded-xl bg-secondary border border-border/50 px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50" />
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -755,11 +756,11 @@ const Nutrition = () => {
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center px-4" onClick={() => setShowCalorieSettings(false)}>
               <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} onClick={(e) => e.stopPropagation()} className="w-full max-w-sm glass-card rounded-2xl p-6 space-y-4">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-lg font-bold text-foreground">Calorie Limit</h2>
+                  <h2 className="text-lg font-bold text-foreground">{t.dailyCalorieLimit}</h2>
                   <button onClick={() => setShowCalorieSettings(false)}><X className="w-5 h-5 text-muted-foreground" /></button>
                 </div>
 
-                <p className="text-xs text-muted-foreground">Auto mode uses the Mifflin-St Jeor BMR formula × your activity level (TDEE). Fill in your profile for a personalized value.</p>
+                <p className="text-xs text-muted-foreground">{ru ? "Автоматический режим использует формулу Миффлина — Сан Жеора и уровень активности (TDEE). Заполните профиль для персонального расчёта." : "Auto mode uses the Mifflin-St Jeor BMR formula × your activity level (TDEE). Fill in your profile for a personalized value."}</p>
 
                 <div className="space-y-2">
                   <button
@@ -783,15 +784,15 @@ const Nutrition = () => {
                       {calorieMode === "manual" && <div className="w-2 h-2 rounded-full bg-primary" />}
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-foreground">Set manually</p>
-                      <p className="text-xs text-muted-foreground">Enter your own daily calorie limit</p>
+                      <p className="text-sm font-medium text-foreground">{ru ? "Установить вручную" : "Set manually"}</p>
+                      <p className="text-xs text-muted-foreground">{ru ? "Введите собственный дневной лимит калорий" : "Enter your own daily calorie limit"}</p>
                     </div>
                   </button>
                 </div>
 
                 {calorieMode === "manual" && (
                   <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }}>
-                    <label className="text-[10px] text-muted-foreground uppercase tracking-wider">Daily Limit (kcal)</label>
+                    <label className="text-[10px] text-muted-foreground uppercase tracking-wider">{ru ? "Дневной лимит (ккал)" : "Daily Limit (kcal)"}</label>
                     <input
                       type="number"
                       value={calorieLimitInput}
@@ -801,7 +802,7 @@ const Nutrition = () => {
                       placeholder="e.g. 2000"
                       className="w-full mt-1 h-10 rounded-xl bg-secondary border border-border/50 px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
                     />
-                    <p className="text-[10px] text-muted-foreground mt-1">Range: 500 – 10,000 kcal</p>
+                    <p className="text-[10px] text-muted-foreground mt-1">{ru ? "Диапазон: 500–10 000 ккал" : "Range: 500–10,000 kcal"}</p>
                   </motion.div>
                 )}
 
@@ -848,10 +849,10 @@ const Nutrition = () => {
             </ResponsiveContainer>
           </div>
           <div className="flex items-center gap-4 mt-2">
-            <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-sm bg-primary" /><span className="text-[10px] text-muted-foreground">Normal</span></div>
-            <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-sm" style={{ background: "hsl(45 93% 47%)" }} /><span className="text-[10px] text-muted-foreground">Near limit</span></div>
-            <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-sm bg-destructive" /><span className="text-[10px] text-muted-foreground">Exceeded</span></div>
-            <div className="flex items-center gap-1.5"><div className="w-6 border-t-2 border-dashed border-destructive" /><span className="text-[10px] text-muted-foreground">Limit</span></div>
+            <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-sm bg-primary" /><span className="text-[10px] text-muted-foreground">{ru ? "Норма" : "Normal"}</span></div>
+            <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-sm" style={{ background: "hsl(45 93% 47%)" }} /><span className="text-[10px] text-muted-foreground">{ru ? "Около лимита" : "Near limit"}</span></div>
+            <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-sm bg-destructive" /><span className="text-[10px] text-muted-foreground">{ru ? "Превышено" : "Exceeded"}</span></div>
+            <div className="flex items-center gap-1.5"><div className="w-6 border-t-2 border-dashed border-destructive" /><span className="text-[10px] text-muted-foreground">{ru ? "Лимит" : "Limit"}</span></div>
           </div>
         </motion.div>
 

@@ -45,7 +45,8 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const displayName = session?.user?.user_metadata?.full_name || session?.user?.email?.split("@")[0] || "User";
   const { theme, toggleTheme } = useThemeContext();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const ru = language === "ru";
   const { goal } = useNutritionGoal();
   const userId = session?.user?.id;
   const today = format(new Date(), "yyyy-MM-dd");
@@ -171,8 +172,8 @@ const Dashboard = () => {
         >
           <div className="flex items-center justify-between mb-4">
             <div>
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Today</p>
-              <h2 className="text-sm font-bold text-foreground">Nutrition</h2>
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">{ru ? "Сегодня" : "Today"}</p>
+              <h2 className="text-sm font-bold text-foreground">{t.nutrition}</h2>
             </div>
             <div className="text-right">
               <p className="text-2xl font-extrabold text-foreground leading-none">{Math.round(totals.calories)}</p>
@@ -200,7 +201,7 @@ const Dashboard = () => {
           className="glass-card p-5 mb-4"
         >
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-foreground">Recent Scans</h3>
+            <h3 className="text-sm font-semibold text-foreground">{ru ? "Последние сканирования" : "Recent Scans"}</h3>
             <button onClick={() => navigate("/scan/history")} className="text-[11px] text-primary font-semibold flex items-center gap-0.5">
               History <ChevronRight className="w-3 h-3" />
             </button>
@@ -246,8 +247,8 @@ const Dashboard = () => {
           className="w-full glass-card p-4 mb-4 flex items-center justify-between hover:bg-card/80 transition-colors"
         >
           <div className="text-left">
-            <p className="text-sm font-semibold text-foreground">Weekly Nutrition Trend</p>
-            <p className="text-[10px] text-muted-foreground">See your 7-day calorie and goal-fit trend</p>
+            <p className="text-sm font-semibold text-foreground">{ru ? "Питание за неделю" : "Weekly Nutrition Trend"}</p>
+            <p className="text-[10px] text-muted-foreground">{ru ? "Калории и соответствие цели за последние 7 дней" : "See your 7-day calorie and goal-fit trend"}</p>
           </div>
           <ChevronRight className="w-4 h-4 text-muted-foreground" />
         </motion.button>

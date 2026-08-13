@@ -13,16 +13,21 @@ import { useAuth } from "@/hooks/useAuth";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const NUTRIENT_LABELS: Record<string, string> = {
   calories: "Calories", protein_g: "Protein", carbs_g: "Carbs", sugar_g: "Sugar",
   fiber_g: "Fiber", fat_g: "Fat", saturated_fat_g: "Sat. Fat", salt_g: "Salt",
 };
+const NUTRIENT_LABELS_RU: Record<string, string> = {
+  calories: "Калории", protein_g: "Белки", carbs_g: "Углеводы", sugar_g: "Сахар",
+  fiber_g: "Клетчатка", fat_g: "Жиры", saturated_fat_g: "Насыщ. жиры", salt_g: "Соль",
+};
 const NUTRIENT_UNITS: Record<string, string> = { calories: "kcal", protein_g: "g", carbs_g: "g", sugar_g: "g", fiber_g: "g", fat_g: "g", saturated_fat_g: "g", salt_g: "g" };
 
-const NutrientCard = ({ k, v }: { k: string; v: number }) => (
+const NutrientCard = ({ k, v, ru }: { k: string; v: number; ru: boolean }) => (
   <div className="glass-card p-3">
-    <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{NUTRIENT_LABELS[k] || k}</p>
+    <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{(ru ? NUTRIENT_LABELS_RU : NUTRIENT_LABELS)[k] || k}</p>
     <p className="text-lg font-bold text-foreground mt-0.5">
       {v.toFixed(k === "calories" ? 0 : 1)}
       <span className="text-xs font-medium text-muted-foreground ml-1">{NUTRIENT_UNITS[k]}</span>
@@ -45,6 +50,8 @@ const ScanResult = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { session } = useAuth();
+  const { language } = useLanguage();
+  const ru = language === "ru";
   const navTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     return () => {
@@ -104,9 +111,9 @@ const ScanResult = () => {
       queryClient.invalidateQueries({ queryKey: ["scan", id] });
       queryClient.invalidateQueries({ queryKey: ["food-logs"] });
       queryClient.invalidateQueries({ queryKey: ["eaten-scan-avg"] });
-      toast.success("Removed from today's meals");
+      toast.success(ru ? "Удалено из сегодняшнего рациона" : "Removed from today's meals");
     },
-    onError: (e: any) => toast.error(e.message || "Failed to undo"),
+    onError: (e: any) => toast.error(e.message || (ru ? "Не удалось отменить" : "Failed to undo")),
   });
 
   const addToMeals = useMutation({
@@ -147,15 +154,15 @@ const ScanResult = () => {
       navTimeoutRef.current = setTimeout(() => {
         navigate("/nutrition");
       }, 5000);
-      toast.success("Added to today's meals", {
+      toast.success(ru ? "Добавлено в сегодняшний рацион" : "Added to today's meals", {
         duration: 5000,
         action: {
-          label: "Отменить",
+          label: ru ? "Отменить" : "Undo",
           onClick: () => undoMeal.mutate(logId),
         },
       });
     },
-    onError: (e: any) => toast.error(e.message || "Failed to add"),
+    onError: (e: any) => toast.error(e.message || (ru ? "Не удалось добавить" : "Failed to add")),
   });
 
   const handleAddClick = () => {
@@ -168,7 +175,7 @@ const ScanResult = () => {
   };
 
   if (isLoading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>;
-  if (!scan) return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Scan not found.</div>;
+  if (!scan) return <div className="min-h-screen flex items-center justify-center text-muted-foreground">{ru ? "Результат не найден." : "Scan not found."}</div>;
 
   const nutrition = (scan.nutrition || {}) as Record<string, number>;
   const whatsGood = (scan.positives as string[]) || [];
@@ -188,7 +195,7 @@ const ScanResult = () => {
           <button onClick={() => navigate("/scan")} className="w-9 h-9 rounded-xl bg-secondary flex items-center justify-center">
             <ArrowLeft className="w-4 h-4" />
           </button>
-          <h1 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Scan Result</h1>
+          <h1 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">{ru ? "Результат сканирования" : "Scan Result"}</h1>
           <div className="w-9 h-9" />
         </div>
 
@@ -209,14 +216,14 @@ const ScanResult = () => {
           {goal === "balanced" || !goal ? (
             <HealthScoreRing score={scan.health_score} category={scan.score_category} size={220} title="Hello Daily Score" />
           ) : (
-            <HealthScoreRing score={fit} size={220} title={`Goal Fit · ${goalLabel(goal)}`} />
+            <HealthScoreRing score={fit} size={220} title={`${ru ? "Соответствие цели" : "Goal Fit"} · ${goalLabel(goal, language)}`} />
           )}
           {goal && goal !== "balanced" && (
             <div
               className="mt-3 px-3 py-1 rounded-full text-[11px] font-bold text-white shadow"
               style={{ background: goalFitColor(fit) }}
             >
-              {goalFitLabel(fit)}
+              {goalFitLabel(fit, language)}
             </div>
           )}
         </motion.div>
@@ -230,14 +237,14 @@ const ScanResult = () => {
             className="rounded-xl px-4 py-3 flex items-center justify-center gap-2 text-sm font-bold !text-white shadow-lg shadow-emerald-900/20 border border-white/20 active:scale-[0.98] transition disabled:opacity-60"
           >
             {addToMeals.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-            {(scan as any).added_at ? "Добавлено" : "Я съел(а) это"}
+            {(scan as any).added_at ? (ru ? "Добавлено" : "Added") : (ru ? "Я съел(а) это" : "I ate this")}
           </button>
           <button
             onClick={() => navigate("/scan")}
             style={{ backgroundImage: "linear-gradient(135deg, hsl(0 80% 62%), hsl(350 75% 50%))" }}
             className="rounded-xl px-4 py-3 flex items-center justify-center gap-2 text-sm font-bold !text-white shadow-lg shadow-rose-900/20 border border-white/20 active:scale-[0.98] transition"
           >
-            <X className="w-4 h-4" /> Пропустить
+            <X className="w-4 h-4" /> {ru ? "Пропустить" : "Skip"}
           </button>
         </motion.div>
 
@@ -248,8 +255,8 @@ const ScanResult = () => {
             <div className="w-10 h-10 rounded-xl flex items-center justify-center font-extrabold text-white"
                  style={{ background: NOVA_COLORS[nova] }}>{nova}</div>
             <div className="flex-1">
-              <p className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground">Processing Level</p>
-              <p className="text-sm font-bold text-foreground">{NOVA_LABELS[nova]}</p>
+              <p className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground">{ru ? "Степень обработки" : "Processing Level"}</p>
+              <p className="text-sm font-bold text-foreground">{ru ? ({1:"NOVA 1 · Необработанный",2:"NOVA 2 · Кулинарный ингредиент",3:"NOVA 3 · Обработанный",4:"NOVA 4 · Ультраобработанный"} as Record<number,string>)[nova] : NOVA_LABELS[nova]}</p>
             </div>
           </motion.div>
         )}
@@ -268,7 +275,7 @@ const ScanResult = () => {
               <Sparkles className="w-4 h-4 text-primary" />
             </div>
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-primary">For Your Goal · {goalLabel(goal)}</p>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-primary">{ru ? "Для вашей цели" : "For Your Goal"} · {goalLabel(goal, language)}</p>
               <p className="text-xs text-foreground/90 leading-relaxed mt-0.5">{recommendation}</p>
             </div>
           </motion.div>
@@ -276,17 +283,17 @@ const ScanResult = () => {
 
         {/* Nutrition */}
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="mb-4">
-          <h3 className="text-xs font-bold text-foreground/70 uppercase tracking-wider mb-2 px-1">Nutrition (per 100g)</h3>
+          <h3 className="text-xs font-bold text-foreground/70 uppercase tracking-wider mb-2 px-1">{ru ? "Пищевая ценность (на 100 г)" : "Nutrition (per 100g)"}</h3>
           <div className="grid grid-cols-2 gap-2">
             {Object.entries(NUTRIENT_LABELS).map(([k]) => nutrition[k] !== undefined && (
-              <NutrientCard key={k} k={k} v={Number(nutrition[k]) || 0} />
+              <NutrientCard key={k} k={k} v={Number(nutrition[k]) || 0} ru={ru} />
             ))}
           </div>
         </motion.div>
 
         {whatsGood.length > 0 && (
           <div className="glass-card p-4 mb-4">
-            <h3 className="text-sm font-bold text-health-activity mb-2 flex items-center gap-2"><Check className="w-4 h-4" /> What's Good</h3>
+            <h3 className="text-sm font-bold text-health-activity mb-2 flex items-center gap-2"><Check className="w-4 h-4" /> {ru ? "Преимущества" : "What's Good"}</h3>
             <ul className="space-y-1.5">
               {whatsGood.map((p, i) => <li key={i} className="text-xs text-foreground/90 flex gap-2"><span className="text-health-activity">✓</span>{p}</li>)}
             </ul>
@@ -295,7 +302,7 @@ const ScanResult = () => {
 
         {thingsToKnow.length > 0 && (
           <div className="glass-card p-4 mb-4">
-            <h3 className="text-sm font-bold text-foreground mb-2 flex items-center gap-2"><Info className="w-4 h-4 text-primary" /> Things To Know</h3>
+            <h3 className="text-sm font-bold text-foreground mb-2 flex items-center gap-2"><Info className="w-4 h-4 text-primary" /> {ru ? "Что важно знать" : "Things To Know"}</h3>
             <ul className="space-y-1.5">
               {thingsToKnow.map((c, i) => <li key={i} className="text-xs text-foreground/90 flex gap-2"><span className="text-primary">·</span>{c}</li>)}
             </ul>
@@ -304,7 +311,7 @@ const ScanResult = () => {
 
         {intel.length > 0 && (
           <div className="glass-card p-4 mb-4">
-            <h3 className="text-sm font-bold text-foreground mb-2 flex items-center gap-2"><Leaf className="w-4 h-4 text-health-activity" /> Ingredient Intelligence</h3>
+            <h3 className="text-sm font-bold text-foreground mb-2 flex items-center gap-2"><Leaf className="w-4 h-4 text-health-activity" /> {ru ? "Анализ ингредиентов" : "Ingredient Intelligence"}</h3>
             <div className="flex flex-wrap gap-1.5">
               {intel.map((i, idx) => {
                 const c = i.rating === "good" ? "bg-health-activity/15 text-health-activity border-health-activity/30"
@@ -318,7 +325,7 @@ const ScanResult = () => {
 
         {allergens.length > 0 && (
           <div className="glass-card p-4 mb-4">
-            <h3 className="text-xs font-bold text-foreground/70 uppercase tracking-wider mb-2">Contains (informational only)</h3>
+            <h3 className="text-xs font-bold text-foreground/70 uppercase tracking-wider mb-2">{ru ? "Содержит (только для информации)" : "Contains (informational only)"}</h3>
             <div className="flex flex-wrap gap-1.5">
               {allergens.map((a) => (
                 <span key={a} className="text-[10px] font-semibold px-2 py-1 rounded-full bg-secondary text-foreground/80 border border-border">{a}</span>
@@ -329,7 +336,7 @@ const ScanResult = () => {
 
         {alternatives.length > 0 && (
           <div className="mb-4">
-            <h3 className="text-xs font-bold text-foreground/70 uppercase tracking-wider mb-2 px-1">Better Fits For Your Goal</h3>
+            <h3 className="text-xs font-bold text-foreground/70 uppercase tracking-wider mb-2 px-1">{ru ? "Лучше подходит для вашей цели" : "Better Fits For Your Goal"}</h3>
             <div className="space-y-2">
               {alternatives.map((a, i) => (
                 <div key={i} className="glass-card p-3">
@@ -341,21 +348,21 @@ const ScanResult = () => {
           </div>
         )}
 
-        <p className="text-[10px] text-muted-foreground text-center px-6 mt-2">Informational only — not medical advice.</p>
+        <p className="text-[10px] text-muted-foreground text-center px-6 mt-2">{ru ? "Только для информации — не является медицинской рекомендацией." : "Informational only — not medical advice."}</p>
       </div>
       <BottomNav />
 
       <Dialog open={portionOpen} onOpenChange={setPortionOpen}>
         <DialogContent className="max-w-xs">
           <DialogHeader>
-            <DialogTitle>Portion size</DialogTitle>
+            <DialogTitle>{ru ? "Размер порции" : "Portion size"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <p className="text-xs text-muted-foreground">
-              Nutrition is per 100g. Enter how many grams you ate to log the correct amount.
+              {ru ? "Пищевая ценность указана на 100 г. Введите съеденный вес для точного расчёта." : "Nutrition is per 100g. Enter how many grams you ate to log the correct amount."}
             </p>
             <div className="space-y-1.5">
-              <Label htmlFor="grams" className="text-xs">Grams eaten</Label>
+              <Label htmlFor="grams" className="text-xs">{ru ? "Съедено граммов" : "Grams eaten"}</Label>
               <Input
                 id="grams"
                 type="number"
@@ -363,7 +370,7 @@ const ScanResult = () => {
                 min={1}
                 value={grams}
                 onChange={(e) => setGrams(e.target.value)}
-                placeholder="e.g. 150"
+                placeholder={ru ? "например, 150" : "e.g. 150"}
               />
             </div>
             {Number(grams) > 0 && (() => {
@@ -383,23 +390,23 @@ const ScanResult = () => {
                 fat_g: Math.round((cur.fat_g + add.fat_g) * 10) / 10,
               };
               const rows: { k: keyof typeof add; label: string; unit: string }[] = [
-                { k: "calories", label: "Calories", unit: "kcal" },
-                { k: "protein_g", label: "Protein", unit: "g" },
-                { k: "carbs_g", label: "Carbs", unit: "g" },
-                { k: "fat_g", label: "Fat", unit: "g" },
+                { k: "calories", label: ru ? "Калории" : "Calories", unit: ru ? "ккал" : "kcal" },
+                { k: "protein_g", label: ru ? "Белки" : "Protein", unit: ru ? "г" : "g" },
+                { k: "carbs_g", label: ru ? "Углеводы" : "Carbs", unit: ru ? "г" : "g" },
+                { k: "fat_g", label: ru ? "Жиры" : "Fat", unit: ru ? "г" : "g" },
               ];
               const fmt = (k: string, v: number) => (k === "calories" ? Math.round(v).toString() : v.toFixed(1));
               return (
                 <div className="space-y-2">
                   <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                    Daily total · adding {grams}g
+                    {ru ? `Итого за день · добавляем ${grams} г` : `Daily total · adding ${grams}g`}
                   </p>
                   <div className="glass-card p-3 space-y-1.5">
                     <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                       <span />
-                      <span className="text-right">Today</span>
-                      <span className="text-right text-primary">+ Add</span>
-                      <span className="text-right">After</span>
+                      <span className="text-right">{ru ? "Сейчас" : "Today"}</span>
+                      <span className="text-right text-primary">+ {ru ? "Добавить" : "Add"}</span>
+                      <span className="text-right">{ru ? "После" : "After"}</span>
                     </div>
                     {rows.map(({ k, label, unit }) => (
                       <div key={k} className="grid grid-cols-[1fr_auto_auto_auto] gap-x-2 items-baseline text-xs">
@@ -418,7 +425,7 @@ const ScanResult = () => {
             <button
               onClick={() => {
                 const g = Number(grams);
-                if (!g || g <= 0) { toast.error("Enter a valid weight"); return; }
+                if (!g || g <= 0) { toast.error(ru ? "Введите корректный вес" : "Enter a valid weight"); return; }
                 addToMeals.mutate(g);
               }}
               disabled={addToMeals.isPending}
@@ -426,14 +433,14 @@ const ScanResult = () => {
               className="rounded-xl px-4 py-3 flex items-center justify-center gap-2 text-sm font-bold !text-white shadow-md active:scale-[0.98] transition disabled:opacity-60"
             >
               {addToMeals.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-              <Plus className="w-4 h-4" /> Добавить
+              <Plus className="w-4 h-4" /> {ru ? "Добавить" : "Add"}
             </button>
             <button
               onClick={() => setPortionOpen(false)}
               style={{ backgroundImage: "linear-gradient(90deg, hsl(0 75% 60%), hsl(350 70% 48%))" }}
               className="rounded-xl px-4 py-3 flex items-center justify-center gap-2 text-sm font-bold !text-white shadow-md active:scale-[0.98] transition"
             >
-              <X className="w-4 h-4" /> Отмена
+              <X className="w-4 h-4" /> {ru ? "Отмена" : "Cancel"}
             </button>
           </DialogFooter>
         </DialogContent>

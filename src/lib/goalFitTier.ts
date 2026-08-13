@@ -9,7 +9,16 @@ export const goalFitTier = (score: number): GoalFitTier => {
   return "poor";
 };
 
-export const goalFitLabel = (score: number): string => {
+export const goalFitLabel = (score: number, language: "en" | "ru" = "en"): string => {
+  if (language === "ru") {
+    switch (goalFitTier(score)) {
+      case "excellent": return "Отлично подходит";
+      case "good": return "Хорошо подходит";
+      case "moderate": return "Подходит умеренно";
+      case "weak": return "Подходит слабо";
+      case "poor": return "Плохо подходит";
+    }
+  }
   switch (goalFitTier(score)) {
     case "excellent": return "Excellent Fit";
     case "good":      return "Good Fit";

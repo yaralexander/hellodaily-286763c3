@@ -1,9 +1,12 @@
 import { ScanLine } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const ScanFoodButton = ({ compact = false }: { compact?: boolean }) => {
   const navigate = useNavigate();
+  const { language } = useLanguage();
+  const ru = language === "ru";
   if (compact) {
     return (
       <button
@@ -14,8 +17,8 @@ const ScanFoodButton = ({ compact = false }: { compact?: boolean }) => {
           <ScanLine className="w-5 h-5 text-white" />
         </div>
         <div className="text-left flex-1">
-          <p className="text-sm font-semibold text-foreground">Scan Food</p>
-          <p className="text-[10px] text-muted-foreground">Barcode · Package · Meal</p>
+          <p className="text-sm font-semibold text-foreground">{ru ? "Сканировать еду" : "Scan Food"}</p>
+          <p className="text-[10px] text-muted-foreground">{ru ? "Штрихкод · Упаковка · Блюдо" : "Barcode · Package · Meal"}</p>
         </div>
       </button>
     );
@@ -32,11 +35,11 @@ const ScanFoodButton = ({ compact = false }: { compact?: boolean }) => {
           <ScanLine className="w-6 h-6" />
         </div>
         <div className="text-left">
-          <p className="text-base font-bold">Scan Food</p>
-          <p className="text-[11px] opacity-90">Instantly check how healthy it is</p>
+          <p className="text-base font-bold">{ru ? "Сканировать еду" : "Scan Food"}</p>
+          <p className="text-[11px] opacity-90">{ru ? "Мгновенно проверьте состав продукта" : "Instantly check how healthy it is"}</p>
         </div>
       </div>
-      <span className="text-xs font-bold uppercase tracking-wider bg-white/15 px-3 py-1.5 rounded-full">New</span>
+      <span className="text-xs font-bold uppercase tracking-wider bg-white/15 px-3 py-1.5 rounded-full">{ru ? "Новое" : "New"}</span>
     </motion.button>
   );
 };

@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { format, subDays } from "date-fns";
 import { useNutritionGoal, goalLabel } from "@/hooks/useNutritionGoal";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 type Insight = { text: string; type: "positive" | "neutral" | "action" };
 
@@ -19,6 +20,8 @@ const AIInsights = () => {
   const { session } = useAuth();
   const userId = session?.user?.id;
   const { goal } = useNutritionGoal();
+  const { language } = useLanguage();
+  const ru = language === "ru";
   const today = format(new Date(), "yyyy-MM-dd");
   const weekStart = format(subDays(new Date(), 6), "yyyy-MM-dd");
 
@@ -63,7 +66,7 @@ const AIInsights = () => {
     );
 
     if (totals.calories === 0 && recentScans.length === 0) {
-      out.push({ type: "neutral", text: `Scan your first meal or product to get personalized ${goalLabel(goal)} insights.` });
+      out.push({ type: "neutral", text: ru ? `Отсканируйте первое блюдо или продукт, чтобы получить рекомендации для цели «${goalLabel(goal, language)}».` : `Scan your first meal or product to get personalized ${goalLabel(goal, language)} insights.` });
       return out;
     }
 
@@ -72,10 +75,10 @@ const AIInsights = () => {
     if (totals.calories > 0 && totals.protein < proteinTarget * 0.6) {
       out.push({
         type: "action",
-        text: `You're at ${Math.round(totals.protein)}g of protein today. Aim for around ${proteinTarget}g to support your ${goalLabel(goal)} goal.`,
+        text: ru ? `Сегодня записано ${Math.round(totals.protein)} г белка. Постарайтесь набрать около ${proteinTarget} г для цели «${goalLabel(goal, language)}».` : `You're at ${Math.round(totals.protein)}g of protein today. Aim for around ${proteinTarget}g to support your ${goalLabel(goal, language)} goal.`,
       });
     } else if (totals.protein >= proteinTarget) {
-      out.push({ type: "positive", text: `Great — ${Math.round(totals.protein)}g protein logged today.` });
+      out.push({ type: "positive", text: ru ? `Отлично — сегодня записано ${Math.round(totals.protein)} г белка.` : `Great — ${Math.round(totals.protein)}g protein logged today.` });
     }
 
     // Ultra-processed insight
@@ -83,7 +86,7 @@ const AIInsights = () => {
     if (recentScans.length >= 3 && nova4 / recentScans.length >= 0.5) {
       out.push({
         type: "action",
-        text: `${nova4} of your last ${recentScans.length} scans were ultra-processed. Try swapping one for a whole-food option.`,
+        text: ru ? `${nova4} из последних ${recentScans.length} продуктов имеют высокую степень обработки. Попробуйте заменить один из них цельным продуктом.` : `${nova4} of your last ${recentScans.length} scans were ultra-processed. Try swapping one for a whole-food option.`,
       });
     }
 
@@ -91,15 +94,15 @@ const AIInsights = () => {
     const withFit = recentScans.filter((s: any) => typeof s.goal_fit_score === "number");
     if (withFit.length >= 3) {
       const avg = Math.round(withFit.reduce((s: number, r: any) => s + r.goal_fit_score, 0) / withFit.length);
-      if (avg >= 75) out.push({ type: "positive", text: `Your recent scans average ${avg}/100 fit for ${goalLabel(goal)}. Keep it up.` });
-      else if (avg < 50) out.push({ type: "action", text: `Recent scans average only ${avg}/100 fit for ${goalLabel(goal)}. Aim for higher-fit swaps.` });
+      if (avg >= 75) out.push({ type: "positive", text: ru ? `Среднее соответствие последних продуктов цели «${goalLabel(goal, language)}» — ${avg}/100. Продолжайте!` : `Your recent scans average ${avg}/100 fit for ${goalLabel(goal, language)}. Keep it up.` });
+      else if (avg < 50) out.push({ type: "action", text: ru ? `Среднее соответствие последних продуктов цели «${goalLabel(goal, language)}» — только ${avg}/100. Ищите более подходящие варианты.` : `Recent scans average only ${avg}/100 fit for ${goalLabel(goal, language)}. Aim for higher-fit swaps.` });
     }
 
     if (out.length === 0) {
-      out.push({ type: "neutral", text: `Keep scanning meals — I'll surface trends for your ${goalLabel(goal)} goal.` });
+      out.push({ type: "neutral", text: ru ? `Продолжайте сканировать блюда — здесь появятся тенденции для цели «${goalLabel(goal, language)}».` : `Keep scanning meals — I'll surface trends for your ${goalLabel(goal, language)} goal.` });
     }
     return out.slice(0, 3);
-  }, [todayLogs, recentScans, goal]);
+  }, [todayLogs, recentScans, goal, language, ru]);
 
   return (
     <motion.div
@@ -112,7 +115,7 @@ const AIInsights = () => {
         <div className="w-7 h-7 rounded-lg bg-health-calories/20 flex items-center justify-center">
           <Sparkles className="w-4 h-4 text-health-calories" />
         </div>
-        <h3 className="text-sm font-semibold text-foreground">AI Nutrition Insights</h3>
+        <h3 className="text-sm font-semibold text-foreground">{ru ? "AI-анализ питания" : "AI Nutrition Insights"}</h3>
       </div>
       <div className="space-y-3">
         {insights.map((insight, i) => (

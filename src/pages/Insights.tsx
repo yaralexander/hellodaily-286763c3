@@ -10,11 +10,14 @@ import AIInsights from "@/components/AIInsights";
 import NutritionGoalPicker from "@/components/scan/NutritionGoalPicker";
 import { useNutritionGoal, goalLabel } from "@/hooks/useNutritionGoal";
 import { goalFitLabel, goalFitColor } from "@/lib/goalFitTier";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const Insights = () => {
   const { session } = useAuth();
   const userId = session?.user?.id;
   const { goal } = useNutritionGoal();
+  const { language } = useLanguage();
+  const ru = language === "ru";
   const weekStart = format(subDays(new Date(), 6), "yyyy-MM-dd");
   const weekEnd = format(new Date(), "yyyy-MM-dd");
 
@@ -55,10 +58,11 @@ const Insights = () => {
       const cals = weeklyLogs
         .filter((l: any) => l.logged_at?.startsWith(ds))
         .reduce((sum: number, l: any) => sum + (l.calories || 0), 0);
-      days.push({ day: format(d, "EEE"), calories: cals });
+      const dayNames = ru ? ["вс", "пн", "вт", "ср", "чт", "пт", "сб"] : ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+      days.push({ day: dayNames[d.getDay()], calories: cals });
     }
     return days;
-  }, [weeklyLogs]);
+  }, [weeklyLogs, ru]);
 
   const avgFit = useMemo(() => {
     const fit = scans.filter((s: any) => typeof s.goal_fit_score === "number");
@@ -70,8 +74,8 @@ const Insights = () => {
     <div className="min-h-screen pb-24">
       <div className="max-w-lg mx-auto px-4 pt-6">
         <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-4">
-          <h1 className="text-xl font-bold text-foreground">Insights</h1>
-          <p className="text-xs text-muted-foreground">Personalized to your {goalLabel(goal)} goal</p>
+          <h1 className="text-xl font-bold text-foreground">{ru ? "Аналитика" : "Insights"}</h1>
+          <p className="text-xs text-muted-foreground">{ru ? `Персонально для вашей цели: ${goalLabel(goal, language)}` : `Personalized to your ${goalLabel(goal, language)} goal`}</p>
         </motion.div>
 
         <div className="mb-4"><NutritionGoalPicker /></div>
@@ -93,9 +97,9 @@ const Insights = () => {
               </div>
             </div>
             <div className="flex-1 min-w-0">
-              <h2 className="text-sm font-bold text-foreground mb-1">Average Goal Fit</h2>
+              <h2 className="text-sm font-bold text-foreground mb-1">{ru ? "Среднее соответствие цели" : "Average Goal Fit"}</h2>
               <p className="text-xs text-muted-foreground leading-relaxed">
-                {goalFitLabel(avgFit)} across your last {scans.length} scan{scans.length === 1 ? "" : "s"}.
+                {ru ? `${goalFitLabel(avgFit, language)} по последним ${scans.length} сканированиям.` : `${goalFitLabel(avgFit, language)} across your last ${scans.length} scan${scans.length === 1 ? "" : "s"}.`}
               </p>
             </div>
           </motion.div>
@@ -106,7 +110,7 @@ const Insights = () => {
           animate={{ opacity: 1, y: 0 }}
           className="glass-card p-5 mb-4"
         >
-          <h3 className="text-sm font-semibold text-foreground mb-3">Weekly Nutrition Trend</h3>
+          <h3 className="text-sm font-semibold text-foreground mb-3">{ru ? "Питание за неделю" : "Weekly Nutrition Trend"}</h3>
           <div className="h-40">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={weeklyChart}>

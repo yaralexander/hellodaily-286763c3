@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { BrowserMultiFormatReader } from "@zxing/browser";
 import { X, Loader2 } from "lucide-react";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface Props {
   onDetected: (code: string) => void;
@@ -12,6 +13,8 @@ const BarcodeScanner = ({ onDetected, onClose }: Props) => {
   const controlsRef = useRef<{ stop: () => void } | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [starting, setStarting] = useState(true);
+  const { language } = useLanguage();
+  const ru = language === "ru";
 
   useEffect(() => {
     const reader = new BrowserMultiFormatReader();
@@ -20,7 +23,7 @@ const BarcodeScanner = ({ onDetected, onClose }: Props) => {
       try {
         const devices = await BrowserMultiFormatReader.listVideoInputDevices();
         const back = devices.find(d => /back|rear|environment/i.test(d.label)) || devices[0];
-        if (!back) throw new Error("No camera found");
+        if (!back) throw new Error(ru ? "Камера не найдена" : "No camera found");
         const controls = await reader.decodeFromVideoDevice(back.deviceId, videoRef.current!, (res, _e, c) => {
           if (res && !stopped) {
             stopped = true;
@@ -31,17 +34,17 @@ const BarcodeScanner = ({ onDetected, onClose }: Props) => {
         controlsRef.current = controls;
         setStarting(false);
       } catch (e: any) {
-        setErr(e.message || "Camera unavailable");
+        setErr(e.message || (ru ? "Камера недоступна" : "Camera unavailable"));
         setStarting(false);
       }
     })();
     return () => { stopped = true; controlsRef.current?.stop(); };
-  }, [onDetected]);
+  }, [onDetected, ru]);
 
   return (
     <div className="fixed inset-0 z-[100] bg-black flex flex-col">
       <div className="flex items-center justify-between p-4 text-white">
-        <h2 className="text-lg font-bold">Scan barcode</h2>
+        <h2 className="text-lg font-bold">{ru ? "Сканировать штрихкод" : "Scan barcode"}</h2>
         <button onClick={onClose} className="w-10 h-10 rounded-full bg-white/15 flex items-center justify-center">
           <X className="w-5 h-5" />
         </button>
@@ -62,7 +65,7 @@ const BarcodeScanner = ({ onDetected, onClose }: Props) => {
           <div className="absolute inset-x-4 bottom-8 p-4 bg-red-500/90 text-white rounded-xl text-sm">{err}</div>
         )}
       </div>
-      <p className="p-4 text-center text-white/80 text-xs">Align the barcode inside the frame</p>
+      <p className="p-4 text-center text-white/80 text-xs">{ru ? "Поместите штрихкод внутрь рамки" : "Align the barcode inside the frame"}</p>
     </div>
   );
 };
