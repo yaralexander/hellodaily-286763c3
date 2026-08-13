@@ -5,7 +5,7 @@ import type { UniversalScore } from "./universalScore.ts";
 import type { NutritionGoal } from "./goalFit.ts";
 import { GOAL_LABELS } from "./goalFit.ts";
 
-const GW = "https://ai.gateway.lovable.dev/v1/chat/completions";
+const GW = "https://api.openai.com/v1/chat/completions";
 
 export type AIInsights = {
   whats_good: string[];
@@ -24,8 +24,8 @@ export async function generateInsights(
   goal: NutritionGoal,
   lang = "en",
 ): Promise<AIInsights> {
-  const key = Deno.env.get("LOVABLE_API_KEY");
-  if (!key) throw new Error("LOVABLE_API_KEY missing");
+  const key = Deno.env.get("OPENAI_API_KEY");
+  if (!key) throw new Error("OPENAI_API_KEY missing");
 
   const sys = `You are an evidence-based AI nutrition coach for Hello Daily.
 Core rules (Goal Fit Score™ philosophy):
@@ -64,7 +64,7 @@ Return JSON with exact shape:
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "google/gemini-2.5-flash",
+      model: "gpt-4.1-mini",
       messages: [{ role: "system", content: sys }, { role: "user", content: user }],
       response_format: { type: "json_object" },
     }),

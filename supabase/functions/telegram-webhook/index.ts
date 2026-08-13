@@ -4,9 +4,10 @@ import type { NormalizedProduct } from "../_shared/foodAdapters.ts";
 import type { NutritionGoal } from "../_shared/goalFit.ts";
 
 const GATEWAY = "https://connector-gateway.lovable.dev/telegram";
-const AI = "https://ai.gateway.lovable.dev/v1/chat/completions";
+const AI = "https://api.openai.com/v1/chat/completions";
 
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
 const TELEGRAM_API_KEY = Deno.env.get("TELEGRAM_API_KEY");
 
 function tgHeaders() {
@@ -232,9 +233,9 @@ async function downloadPhoto(fileId: string): Promise<{ base64: string; mimeType
 async function visionAnalyze(base64: string, mimeType: string, lang: "ru" | "en" = "ru") {
   const r = await fetch(AI, {
     method: "POST",
-    headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+    headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "google/gemini-2.5-flash",
+      model: "gpt-4.1-mini",
       messages: [
         { role: "system", content: "You estimate nutrition of meals from photos. Output JSON only." },
         {
@@ -266,7 +267,7 @@ function scoreEmoji(s: number) {
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") return new Response("Method not allowed", { status: 405 });
-  if (!LOVABLE_API_KEY || !TELEGRAM_API_KEY) return new Response("Not configured", { status: 500 });
+  if (!LOVABLE_API_KEY || !OPENAI_API_KEY || !TELEGRAM_API_KEY) return new Response("Not configured", { status: 500 });
 
   const expected = await deriveSecret(TELEGRAM_API_KEY);
   if (!safeEqual(req.headers.get("X-Telegram-Bot-Api-Secret-Token"), expected)) {
@@ -367,9 +368,9 @@ Deno.serve(async (req) => {
     } else {
       const r = await fetch(AI, {
         method: "POST",
-        headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+        headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
+          model: "gpt-4.1-mini",
           messages: [
             { role: "system", content: "You estimate nutrition of meals from text descriptions. Output JSON only." },
             { role: "user", content: `${t.textPrompt(text!)} Return JSON (dish_name and portion_estimate in ${lang === "ru" ? "Russian" : "English"}):

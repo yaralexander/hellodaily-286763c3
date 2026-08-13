@@ -8,7 +8,7 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
-const GW = "https://ai.gateway.lovable.dev/v1/chat/completions";
+const GW = "https://api.openai.com/v1/chat/completions";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -24,12 +24,12 @@ Deno.serve(async (req) => {
     const { imageBase64, mimeType, lang } = await req.json();
     if (!imageBase64) return j({ error: "imageBase64 required" }, 400);
 
-    const key = Deno.env.get("LOVABLE_API_KEY")!;
+    const key = Deno.env.get("OPENAI_API_KEY")!;
     const r = await fetch(GW, {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "gpt-4.1-mini",
         messages: [
           { role: "system", content: "You estimate nutrition of meals from photos. Output JSON only." },
           { role: "user", content: [
