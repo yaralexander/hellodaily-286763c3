@@ -1,4 +1,5 @@
 import { db, id } from "./database.mjs";
+import { calculateHealthScore } from "./health-score.mjs";
 
 const model = process.env.OPENAI_MODEL || "gpt-4.1-mini";
 
@@ -19,11 +20,11 @@ async function openAI(messages) {
 }
 
 const scanShape = `Return JSON only in this exact shape:
-{"product_name":"","brand":null,"portion_estimate":"","category":"","nutrition":{"calories":0,"protein_g":0,"carbs_g":0,"sugar_g":0,"fiber_g":0,"fat_g":0,"saturated_fat_g":0,"salt_g":0},"ingredients":[],"nova_group":1,"additives":[],"health_score":0,"positives":[],"concerns":[],"alternatives":[],"ingredient_intelligence":[],"ai_summary":"","coach_tip":"","allergens":[],"personalized_recommendation":"","things_to_know":[]}.
-health_score must be an integer from 0 to 100. Nutrition is for the described portion for a meal, or per 100 g for a packaged product.`;
+{"product_name":"","brand":null,"portion_estimate":"","portion_grams":100,"category":"","is_beverage":false,"has_sweeteners":false,"fruit_vegetable_legume_percent":0,"nutrition":{"calories":0,"protein_g":0,"carbs_g":0,"sugar_g":0,"fiber_g":0,"fat_g":0,"saturated_fat_g":0,"salt_g":0},"ingredients":[],"nova_group":1,"additives":[],"positives":[],"concerns":[],"alternatives":[],"ingredient_intelligence":[],"ai_summary":"","coach_tip":"","allergens":[],"personalized_recommendation":"","things_to_know":[]}.
+Nutrition is for the described portion for a meal, or per 100 g for a packaged product. portion_grams is the estimated edible serving mass; use 100 for packaged nutrition reported per 100 g. Do not invent medical concerns.`;
 
 function normalizeScan(value, fallbackName) {
-  const score = Math.max(0, Math.min(100, Math.round(Number(value.health_score) || 50)));
+  const score = calculateHealthScore(value.nutrition || {}, { portionGrams: value.portion_grams, novaGroup: value.nova_group, additives: value.additives, isBeverage: value.is_beverage, hasSweeteners: value.has_sweeteners, fruitVegetableLegumePercent: value.fruit_vegetable_legume_percent });
   return {
     product_name: value.product_name || fallbackName,
     brand: value.brand || null,
@@ -77,7 +78,8 @@ export async function scanBarcode(userId, body) {
   if (!value.product) throw new Error("Product not found");
   const p = value.product;
   const n = p.nutriments || {};
-  const base = { product_name: p.product_name || "Unknown product", brand: p.brands || null, category: p.categories?.split(",")[0] || null, nutrition: { calories: n["energy-kcal_100g"] || 0, protein_g: n.proteins_100g || 0, carbs_g: n.carbohydrates_100g || 0, sugar_g: n.sugars_100g || 0, fiber_g: n.fiber_100g || 0, fat_g: n.fat_100g || 0, saturated_fat_g: n["saturated-fat_100g"] || 0, salt_g: n.salt_100g || 0 }, ingredients: p.ingredients_text ? [p.ingredients_text] : [], nova_group: p.nova_group || null, additives: p.additives_tags || [], health_score: p.nutriscore_score == null ? 50 : Math.max(10, Math.min(90, 70 - Number(p.nutriscore_score) * 2)), positives: [], concerns: [], alternatives: [], ingredient_intelligence: [], ai_summary: "", coach_tip: "", allergens: p.allergens_tags || [], personalized_recommendation: "", things_to_know: [] };
+  const categories = `${p.categories || ""} ${(p.categories_tags || []).join(" ")}`;
+  const base = { product_name: p.product_name || "Unknown product", brand: p.brands || null, category: p.categories?.split(",")[0] || null, is_beverage: /beverage|drink|soda|juice/i.test(categories), has_sweeteners: (p.additives_tags || []).some((tag) => /sweetener/i.test(tag)), fruit_vegetable_legume_percent: n["fruits-vegetables-nuts-estimate-from-ingredients_100g"] || 0, nutrition: { calories: n["energy-kcal_100g"] || 0, protein_g: n.proteins_100g || 0, carbs_g: n.carbohydrates_100g || 0, sugar_g: n.sugars_100g || 0, fiber_g: n.fiber_100g || 0, fat_g: n.fat_100g || 0, saturated_fat_g: n["saturated-fat_100g"] || 0, salt_g: n.salt_100g || 0 }, ingredients: p.ingredients_text ? [p.ingredients_text] : [], nova_group: p.nova_group || null, additives: p.additives_tags || [], positives: [], concerns: [], alternatives: [], ingredient_intelligence: [], ai_summary: "", coach_tip: "", allergens: p.allergens_tags || [], personalized_recommendation: "", things_to_know: [] };
   return storeScan(userId, "barcode", "open_food_facts", normalizeScan(base, base.product_name), String(body.barcode));
 }
 
