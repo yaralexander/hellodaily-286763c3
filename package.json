@@ -11,6 +11,7 @@
     "preview": "vite preview",
     "start": "node server.mjs",
     "import:supabase": "node scripts/import-supabase.mjs",
+    "import:json": "node scripts/import-json.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },
