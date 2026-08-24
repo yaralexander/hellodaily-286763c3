@@ -37,7 +37,8 @@ const Auth = () => {
           options: { emailRedirectTo: window.location.origin },
         });
         if (error) throw error;
-        toast.success(language === "ru" ? "Проверьте email для подтверждения!" : "Check your email to confirm your account!");
+        toast.success(language === "ru" ? "Аккаунт создан" : "Account created");
+        navigate("/");
       }
     } catch (error: any) {
       toast.error(error.message);
@@ -48,7 +49,6 @@ const Auth = () => {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const handoff = params.get("oauth_handoff");
     const oauthError = params.get("oauth_error");
 
     if (oauthError) {
@@ -56,22 +56,6 @@ const Auth = () => {
       navigate("/auth", { replace: true });
       return;
     }
-    if (!handoff) return;
-
-    setLoading(true);
-    fetch(`/account/auth/session?handoff=${encodeURIComponent(handoff)}`, { credentials: "same-origin" })
-      .then(async (response) => {
-        const payload = await response.json();
-        if (!response.ok) throw new Error(payload.error || "OAuth session expired");
-        const { error } = await supabase.auth.setSession(payload);
-        if (error) throw error;
-        navigate("/", { replace: true });
-      })
-      .catch((error) => {
-        toast.error(error instanceof Error ? error.message : "Failed to sign in with Google");
-        navigate("/auth", { replace: true });
-      })
-      .finally(() => setLoading(false));
   }, [language, navigate]);
 
   const handleGoogleSignIn = () => {

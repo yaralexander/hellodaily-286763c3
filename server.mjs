@@ -1,23 +1,25 @@
 import crypto from "node:crypto";
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import express from "express";
 import { OAuth2Client } from "google-auth-library";
+import { backupDatabase, createPasswordUser, createSession, dataDir, db, deleteSession, getSessionUser, id, upsertGoogleUser, verifyPasswordUser } from "./server/database.mjs";
+import { analyzeFood, analyzeFoodText, recalculateGoal, scanBarcode, scanImage, scanText } from "./server/food-ai.mjs";
+import { telegramWebhook } from "./server/telegram.mjs";
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
 const siteUrl = new URL(process.env.SITE_URL || "http://localhost:3000").origin;
 const googleClientId = process.env.GOOGLE_OAUTH_CLIENT_ID;
 const googleClientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET;
-const supabaseUrl = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "").replace(/\/$/, "");
-const supabaseKey = process.env.SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 const callbackUrl = `${siteUrl}/account/auth/google/callback`;
 const oauthClient = new OAuth2Client(googleClientId, googleClientSecret, callbackUrl);
 const distDir = path.join(path.dirname(fileURLToPath(import.meta.url)), "dist");
-const handoffs = new Map();
 
 app.set("trust proxy", true);
 app.disable("x-powered-by");
+app.use(express.json({ limit: "25mb" }));
 
 const cookieOptions = `Path=/account/auth/google/callback; HttpOnly; SameSite=Lax; Max-Age=600${siteUrl.startsWith("https://") ? "; Secure" : ""}`;
 
@@ -53,27 +55,24 @@ function clearOAuthCookies(res) {
   }
 }
 
-function requireOAuthConfig(res) {
-  if (googleClientId && googleClientSecret && supabaseUrl && supabaseKey) return true;
-  res.status(503).send("Google authentication is not configured");
-  return false;
+function sessionCookie(token, maxAge = 2_592_000) {
+  return `hd_session=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${siteUrl.startsWith("https://") ? "; Secure" : ""}`;
 }
 
-async function createSupabaseSession(idToken, nonce) {
-  const response = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=id_token`, {
-    method: "POST",
-    headers: {
-      apikey: supabaseKey,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ provider: "google", id_token: idToken, nonce }),
-  });
+function currentUser(req) {
+  return getSessionUser(readCookies(req).hd_session);
+}
 
-  const payload = await response.json();
-  if (!response.ok || !payload.access_token || !payload.refresh_token) {
-    throw new Error(payload.error_description || payload.msg || "Supabase rejected the Google identity");
-  }
-  return { access_token: payload.access_token, refresh_token: payload.refresh_token };
+function requireUser(req, res) {
+  const user = currentUser(req);
+  if (!user) res.status(401).json({ error: "Unauthorized" });
+  return user;
+}
+
+function requireOAuthConfig(res) {
+  if (googleClientId && googleClientSecret) return true;
+  res.status(503).send("Google authentication is not configured");
+  return false;
 }
 
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
@@ -127,37 +126,184 @@ app.get("/account/auth/google/callback", async (req, res) => {
       throw new Error("Google identity verification failed");
     }
 
-    const session = await createSupabaseSession(tokens.id_token, cookies.hd_oauth_nonce);
-    const handoff = randomBase64Url();
-    handoffs.set(handoff, { session, expiresAt: Date.now() + 120_000 });
-    res.redirect(303, `/auth?oauth_handoff=${encodeURIComponent(handoff)}`);
+    const localUser = upsertGoogleUser(identity);
+    res.append("Set-Cookie", sessionCookie(createSession(localUser.id)));
+
+    res.redirect(303, "/");
   } catch (error) {
     console.error("Google OAuth callback failed:", error instanceof Error ? error.message : error);
     res.redirect(303, "/auth?oauth_error=google");
   }
 });
 
-app.get("/account/auth/session", (req, res) => {
-  const handoff = typeof req.query.handoff === "string" ? req.query.handoff : "";
-  const record = handoffs.get(handoff);
-  handoffs.delete(handoff);
-  if (!record || record.expiresAt < Date.now()) {
-    res.status(400).json({ error: "OAuth session expired" });
-    return;
-  }
-  res.set("Cache-Control", "no-store").json(record.session);
+app.get("/api/auth/session", (req, res) => {
+  const user = currentUser(req);
+  res.set("Cache-Control", "no-store").json({ user });
 });
 
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, record] of handoffs) {
-    if (record.expiresAt < now) handoffs.delete(key);
+app.post("/api/auth/signup", (req, res) => {
+  try {
+    const user = createPasswordUser(String(req.body.email || ""), String(req.body.password || ""));
+    res.append("Set-Cookie", sessionCookie(createSession(user.id)));
+    res.status(201).json({ user: { id: user.id, email: user.email, name: user.name, avatar_url: user.avatar_url } });
+  } catch (error) {
+    res.status(400).json({ error: String(error.message || error).includes("UNIQUE") ? "Email is already registered" : String(error.message || error) });
   }
-}, 60_000).unref();
+});
+
+app.post("/api/auth/password", (req, res) => {
+  const user = verifyPasswordUser(String(req.body.email || ""), String(req.body.password || ""));
+  if (!user) return res.status(401).json({ error: "Invalid email or password" });
+  res.append("Set-Cookie", sessionCookie(createSession(user.id)));
+  res.json({ user: { id: user.id, email: user.email, name: user.name, avatar_url: user.avatar_url } });
+});
+
+app.post("/api/auth/signout", (req, res) => {
+  deleteSession(readCookies(req).hd_session);
+  res.append("Set-Cookie", sessionCookie("", 0));
+  res.json({ ok: true });
+});
+
+const jsonColumns = new Set(["health_goals", "ai_analysis", "nutrition", "ingredients", "additives", "positives", "concerns", "alternatives", "ingredient_intelligence", "allergens", "things_to_know", "analysis", "messages"]);
+const allowedTables = new Set(["profiles", "food_logs", "food_scans", "wellness_points", "lab_results", "daily_metrics", "habits", "habit_logs", "notes", "coach_sessions", "weight_logs"]);
+const tableColumns = new Map([...allowedTables].map((table) => [table, new Set(db.prepare(`PRAGMA table_info(${table})`).all().map((column) => column.name))]));
+
+function decodeRow(row) {
+  if (!row) return row;
+  return Object.fromEntries(Object.entries(row).map(([key, value]) => {
+    if (jsonColumns.has(key) && typeof value === "string") {
+      try { return [key, JSON.parse(value)]; } catch { return [key, value]; }
+    }
+    if (["is_todo", "completed"].includes(key)) return [key, !!value];
+    return [key, value];
+  }));
+}
+
+function encodeRecord(record, userId, table, includeId = true) {
+  const columns = tableColumns.get(table);
+  const result = Object.fromEntries(Object.entries(record).filter(([key]) => columns.has(key)));
+  result.user_id = userId;
+  if (includeId && !result.id) result.id = id();
+  if (includeId) {
+    const now = new Date().toISOString();
+    if (columns.has("created_at") && !result.created_at) result.created_at = now;
+    if (columns.has("logged_at") && !result.logged_at) result.logged_at = now;
+    if (columns.has("scanned_at") && !result.scanned_at) result.scanned_at = now;
+  }
+  for (const key of Object.keys(result)) {
+    if (jsonColumns.has(key) && result[key] != null && typeof result[key] !== "string") result[key] = JSON.stringify(result[key]);
+    if (typeof result[key] === "boolean") result[key] = result[key] ? 1 : 0;
+  }
+  return result;
+}
+
+app.get("/api/data/:table", (req, res) => {
+  const user = requireUser(req, res); if (!user) return;
+  const { table } = req.params;
+  if (!allowedTables.has(table)) return res.status(404).json({ error: "Unknown resource" });
+  const limit = Math.min(Number(req.query.limit) || 100, 500);
+  const orderColumn = ["created_at", "logged_at", "scanned_at", "date"].includes(String(req.query.order)) ? String(req.query.order) : "created_at";
+  const direction = req.query.ascending === "true" ? "ASC" : "DESC";
+  const rows = db.prepare(`SELECT * FROM ${table} WHERE user_id=? ORDER BY ${orderColumn} ${direction} LIMIT ?`).all(user.id, limit);
+  res.json(rows.map(decodeRow));
+});
+
+app.get("/api/data/:table/:recordId", (req, res) => {
+  const user = requireUser(req, res); if (!user) return;
+  const { table, recordId } = req.params;
+  if (!allowedTables.has(table)) return res.status(404).json({ error: "Unknown resource" });
+  const row = db.prepare(`SELECT * FROM ${table} WHERE id=? AND user_id=?`).get(recordId, user.id);
+  if (!row) return res.status(404).json({ error: "Not found" });
+  res.json(decodeRow(row));
+});
+
+app.post("/api/data/:table", (req, res) => {
+  const user = requireUser(req, res); if (!user) return;
+  const { table } = req.params;
+  if (!allowedTables.has(table)) return res.status(404).json({ error: "Unknown resource" });
+  const records = (Array.isArray(req.body) ? req.body : [req.body]).map((row) => encodeRecord(row, user.id, table));
+  const inserted = [];
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    for (const record of records) {
+      const keys = Object.keys(record);
+      db.prepare(`INSERT INTO ${table} (${keys.join(",")}) VALUES (${keys.map(() => "?").join(",")})`).run(...keys.map((key) => record[key]));
+      inserted.push(decodeRow(db.prepare(`SELECT * FROM ${table} WHERE id=?`).get(record.id)));
+    }
+    db.exec("COMMIT");
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
+  res.status(201).json(inserted);
+});
+
+app.patch("/api/data/:table/:recordId", (req, res) => {
+  const user = requireUser(req, res); if (!user) return;
+  const { table, recordId } = req.params;
+  if (!allowedTables.has(table)) return res.status(404).json({ error: "Unknown resource" });
+  const record = encodeRecord(req.body, user.id, table, false);
+  delete record.user_id; delete record.id; delete record.created_at;
+  const keys = Object.keys(record);
+  if (keys.length) db.prepare(`UPDATE ${table} SET ${keys.map((key) => `${key}=?`).join(",")} WHERE id=? AND user_id=?`).run(...keys.map((key) => record[key]), recordId, user.id);
+  res.json(decodeRow(db.prepare(`SELECT * FROM ${table} WHERE id=? AND user_id=?`).get(recordId, user.id)));
+});
+
+app.delete("/api/data/:table/:recordId", (req, res) => {
+  const user = requireUser(req, res); if (!user) return;
+  const { table, recordId } = req.params;
+  if (!allowedTables.has(table)) return res.status(404).json({ error: "Unknown resource" });
+  db.prepare(`DELETE FROM ${table} WHERE id=? AND user_id=?`).run(recordId, user.id);
+  res.json({ ok: true });
+});
+
+app.post("/api/uploads", async (req, res) => {
+  const user = requireUser(req, res); if (!user) return;
+  const bucket = String(req.body.bucket || "").replace(/[^a-z0-9_-]/gi, "");
+  const relativePath = String(req.body.path || "").split("/").map((part) => part.replace(/[^a-z0-9._-]/gi, "")).filter(Boolean).join("/");
+  const content = String(req.body.base64 || "");
+  if (!bucket || !relativePath || !content || content.length > 20_000_000) return res.status(400).json({ error: "Invalid upload" });
+  const target = path.join(dataDir, "uploads", bucket, relativePath);
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  fs.writeFileSync(target, Buffer.from(content, "base64"));
+  res.status(201).json({ path: relativePath });
+});
+
+app.post("/api/functions/:name", async (req, res) => {
+  const user = requireUser(req, res); if (!user) return;
+  try {
+    const handlers = {
+      "scan-text": () => scanText(user.id, req.body),
+      "scan-meal": () => scanImage(user.id, req.body, "meal"),
+      "scan-package": () => scanImage(user.id, req.body, "package"),
+      "scan-barcode": () => scanBarcode(user.id, req.body),
+      "analyze-food": () => analyzeFood(req.body),
+      "analyze-food-text": () => analyzeFoodText(req.body),
+      "recalc-goal-fit": () => recalculateGoal(user.id, req.body.goal),
+    };
+    const handler = handlers[req.params.name];
+    if (!handler) return res.status(404).json({ error: "Unknown function" });
+    res.json(await handler());
+  } catch (error) {
+    console.error(`${req.params.name} failed`, error instanceof Error ? error.message : error);
+    res.status(500).json({ error: error instanceof Error ? error.message : "Request failed" });
+  }
+});
+
+app.post("/api/telegram/webhook", telegramWebhook);
+
+app.use("/uploads", express.static(path.join(dataDir, "uploads"), { immutable: true, maxAge: "1y" }));
+setInterval(() => { try { backupDatabase(); } catch (error) { console.error("SQLite backup failed", error); } }, 86_400_000).unref();
+
+app.use((error, _req, res, _next) => {
+  console.error("API request failed", error instanceof Error ? error.message : error);
+  res.status(500).json({ error: "Internal server error" });
+});
 
 app.use(express.static(distDir, { index: false, maxAge: "1h" }));
 app.use((_req, res) => res.sendFile(path.join(distDir, "index.html")));
 
-app.listen(port, "0.0.0.0", () => {
+const server = app.listen(port, "0.0.0.0", () => {
   console.log(`Hello Daily listening on port ${port}`);
 });
+server.ref();
