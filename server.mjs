@@ -11,17 +11,30 @@ import { telegramWebhook } from "./server/telegram.mjs";
 const app = express();
 const port = Number(process.env.PORT || 3000);
 const siteUrl = new URL(process.env.SITE_URL || "http://localhost:3000").origin;
+const allowedSiteUrls = new Set([siteUrl, "https://hellodaily.pages.dev"]);
 const googleClientId = process.env.GOOGLE_OAUTH_CLIENT_ID;
 const googleClientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET;
-const callbackUrl = `${siteUrl}/account/auth/google/callback`;
-const oauthClient = new OAuth2Client(googleClientId, googleClientSecret, callbackUrl);
+function requestSiteUrl(req) {
+  const forwarded = req.get("x-hellodaily-origin");
+  if (!forwarded) return siteUrl;
+  try {
+    const origin = new URL(forwarded).origin;
+    return allowedSiteUrls.has(origin) ? origin : siteUrl;
+  } catch {
+    return siteUrl;
+  }
+}
+
+function oauthClientFor(origin) {
+  return new OAuth2Client(googleClientId, googleClientSecret, `${origin}/account/auth/google/callback`);
+}
 const distDir = path.join(path.dirname(fileURLToPath(import.meta.url)), "dist");
 
 app.set("trust proxy", true);
 app.disable("x-powered-by");
 app.use(express.json({ limit: "25mb" }));
 
-const cookieOptions = `Path=/account/auth/google/callback; HttpOnly; SameSite=Lax; Max-Age=600${siteUrl.startsWith("https://") ? "; Secure" : ""}`;
+const cookieOptions = `Path=/account/auth/google/callback; HttpOnly; SameSite=Lax; Max-Age=600; Secure`;
 
 function randomBase64Url(bytes = 32) {
   return crypto.randomBytes(bytes).toString("base64url");
@@ -77,7 +90,7 @@ function requireOAuthConfig(res) {
 
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
 
-app.get("/account/login/start", (_req, res) => {
+app.get("/account/login/start", (req, res) => {
   if (!requireOAuthConfig(res)) return;
 
   const state = randomBase64Url();
@@ -87,7 +100,8 @@ app.get("/account/login/start", (_req, res) => {
   setOAuthCookie(res, "hd_oauth_nonce", nonce);
   setOAuthCookie(res, "hd_oauth_verifier", verifier);
 
-  res.redirect(oauthClient.generateAuthUrl({
+  const origin = requestSiteUrl(req);
+  res.redirect(oauthClientFor(origin).generateAuthUrl({
     access_type: "online",
     scope: ["openid", "email", "profile"],
     prompt: "select_account",
@@ -113,6 +127,9 @@ app.get("/account/auth/google/callback", async (req, res) => {
     }
     if (!cookies.hd_oauth_nonce || !cookies.hd_oauth_verifier) throw new Error("OAuth session expired");
 
+    const origin = requestSiteUrl(req);
+    const callbackUrl = `${origin}/account/auth/google/callback`;
+    const oauthClient = oauthClientFor(origin);
     const { tokens } = await oauthClient.getToken({
       code: req.query.code,
       codeVerifier: cookies.hd_oauth_verifier,
