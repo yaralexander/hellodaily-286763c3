@@ -40,18 +40,23 @@ async function imageData(fileId) {
   return { base64: Buffer.from(await response.arrayBuffer()).toString("base64"), mimeType: filePath.endsWith(".png") ? "image/png" : "image/jpeg" };
 }
 
-async function analyze(content, lang) {
-  if (!process.env.OPENAI_API_KEY) throw new Error("OpenAI is not configured");
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST", headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ model: process.env.OPENAI_MODEL || "gpt-4.1-mini", response_format: { type: "json_object" }, messages: [
-      { role: "system", content: `Analyze meals. Write in ${lang === "ru" ? "Russian" : "English"}. Return JSON: {"dish_name":"","portion":"","portion_grams":100,"is_beverage":false,"has_sweeteners":false,"fruit_vegetable_legume_percent":0,"nutrition":{"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"sugar_g":0,"fiber_g":0,"saturated_fat_g":0,"salt_g":0},"nova_group":1,"additives":[],"good":[],"know":[],"tip":""}. Nutrition is for the complete stated portion. portion_grams is edible mass. Do not assign a health score and do not treat digestive sensitivity as poor food quality.` },
-      { role: "user", content },
-    ] }),
+async function analyze(input, lang) {
+  const baseUrl = String(process.env.LOVABLE_AI_URL || "").replace(/\/$/, "");
+  const publishableKey = process.env.LOVABLE_PUBLISHABLE_KEY || "";
+  if (!baseUrl || !publishableKey) throw new Error("Lovable AI is not configured");
+
+  const response = await fetch(`${baseUrl}/api/public/telegram-food-analysis`, {
+    method: "POST",
+    headers: { apikey: publishableKey, "Content-Type": "application/json" },
+    body: JSON.stringify({ ...input, lang }),
   });
-  if (!response.ok) throw new Error("AI analysis failed");
-  const payload = await response.json();
-  return JSON.parse(payload.choices?.[0]?.message?.content || "{}");
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    if (response.status === 402) throw new Error("Lovable AI credits are exhausted");
+    if (response.status === 429) throw new Error("Lovable AI rate limit exceeded");
+    throw new Error(payload.message || payload.error || "Lovable AI analysis failed");
+  }
+  return payload;
 }
 
 function escapeHtml(value) { return String(value || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
@@ -80,9 +85,12 @@ export async function telegramWebhook(req, res) {
     if (!cfg.goal || text.startsWith("/goal")) return void await send(chatId, tr(lang, "🎯 Выберите цель питания", "🎯 Choose your nutrition goal"), goalKeyboard(lang));
     if (text.startsWith("/start") || text.startsWith("/help") || (!text && !message.photo?.length)) return void await send(chatId, tr(lang, "👋 Отправьте фото или описание еды — я оценю калории, БЖУ и качество.", "👋 Send a food photo or description for calories, macros and quality."));
     await send(chatId, tr(lang, "🔍 Анализирую…", "🔍 Analyzing…"));
-    let content = text;
-    if (message.photo?.length) { const photo = await imageData(message.photo.at(-1).file_id); content = [{ type: "text", text: "Analyze this meal photo" }, { type: "image_url", image_url: { url: `data:${photo.mimeType};base64,${photo.base64}` } }]; }
-    const result = await analyze(content, lang);
+    let analysisInput = { text };
+    if (message.photo?.length) {
+      const photo = await imageData(message.photo.at(-1).file_id);
+      analysisInput = { imageBase64: photo.base64, mimeType: photo.mimeType };
+    }
+    const result = await analyze(analysisInput, lang);
     const nutrition = result.nutrition || {};
     const score = calculateHealthScore(nutrition, { portionGrams: result.portion_grams, novaGroup: result.nova_group, additives: result.additives, isBeverage: result.is_beverage, hasSweeteners: result.has_sweeteners, fruitVegetableLegumePercent: result.fruit_vegetable_legume_percent });
     const lines = [`${score >= 80 ? "🟢" : score >= 60 ? "🟡" : score >= 40 ? "🟠" : "🔴"} <b>${escapeHtml(result.dish_name)}</b>`, result.portion ? escapeHtml(result.portion) : "", "", `<b>Health Score:</b> ${score}/100`, `🔥 ${Math.round(nutrition.calories || 0)} kcal · P ${Math.round(nutrition.protein_g || 0)}g · C ${Math.round(nutrition.carbs_g || 0)}g · F ${Math.round(nutrition.fat_g || 0)}g`, ...(result.good || []).slice(0, 3).map((x) => `✅ ${escapeHtml(x)}`), ...(result.know || []).slice(0, 3).map((x) => `ℹ️ ${escapeHtml(x)}`), result.tip ? `💡 ${escapeHtml(result.tip)}` : ""].filter(Boolean);
